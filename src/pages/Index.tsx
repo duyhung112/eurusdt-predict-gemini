@@ -5,9 +5,10 @@ import { AIAnalysis } from "@/components/AIAnalysis";
 import { AIPredictions } from "@/components/AIPredictions";
 import { TradingSignals } from "@/components/TradingSignals";
 import { NewsAnalysis } from "@/components/NewsAnalysis";
+import { ComprehensiveAnalysisComponent } from "@/components/ComprehensiveAnalysis";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Brain, Target, BarChart3, Newspaper } from "lucide-react";
+import { TrendingUp, Brain, Target, BarChart3, Newspaper, Zap } from "lucide-react";
 
 const Index = () => {
   const [marketData, setMarketData] = useState({
@@ -73,8 +74,12 @@ const Index = () => {
           <div className="space-y-6">
             <TradingSignals />
             
-            <Tabs defaultValue="analysis" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-slate-700">
+            <Tabs defaultValue="comprehensive" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-700">
+                <TabsTrigger value="comprehensive" className="data-[state=active]:bg-purple-600">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Tổng Hợp
+                </TabsTrigger>
                 <TabsTrigger value="analysis" className="data-[state=active]:bg-blue-600">
                   <Brain className="h-4 w-4 mr-2" />
                   AI Analysis
@@ -88,6 +93,10 @@ const Index = () => {
                   News
                 </TabsTrigger>
               </TabsList>
+              
+              <TabsContent value="comprehensive" className="mt-4">
+                <ComprehensiveAnalysisComponent />
+              </TabsContent>
               
               <TabsContent value="analysis" className="mt-4">
                 <AIAnalysis />
