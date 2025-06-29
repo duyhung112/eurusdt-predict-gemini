@@ -4,9 +4,10 @@ import { TradingViewWidget } from "@/components/TradingViewWidget";
 import { AIAnalysis } from "@/components/AIAnalysis";
 import { AIPredictions } from "@/components/AIPredictions";
 import { TradingSignals } from "@/components/TradingSignals";
+import { NewsAnalysis } from "@/components/NewsAnalysis";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Brain, Target, BarChart3 } from "lucide-react";
+import { TrendingUp, Brain, Target, BarChart3, Newspaper } from "lucide-react";
 
 const Index = () => {
   const [marketData, setMarketData] = useState({
@@ -73,7 +74,7 @@ const Index = () => {
             <TradingSignals />
             
             <Tabs defaultValue="analysis" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-slate-800 border-slate-700">
+              <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-slate-700">
                 <TabsTrigger value="analysis" className="data-[state=active]:bg-blue-600">
                   <Brain className="h-4 w-4 mr-2" />
                   AI Analysis
@@ -81,6 +82,10 @@ const Index = () => {
                 <TabsTrigger value="predictions" className="data-[state=active]:bg-blue-600">
                   <Target className="h-4 w-4 mr-2" />
                   Predictions
+                </TabsTrigger>
+                <TabsTrigger value="news" className="data-[state=active]:bg-blue-600">
+                  <Newspaper className="h-4 w-4 mr-2" />
+                  News
                 </TabsTrigger>
               </TabsList>
               
@@ -90,6 +95,10 @@ const Index = () => {
               
               <TabsContent value="predictions" className="mt-4">
                 <AIPredictions />
+              </TabsContent>
+              
+              <TabsContent value="news" className="mt-4">
+                <NewsAnalysis />
               </TabsContent>
             </Tabs>
           </div>
