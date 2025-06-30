@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Brain, RefreshCw, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { generateComprehensiveAnalysis, ComprehensiveAnalysis } from "@/utils/comprehensiveAnalysis";
+import { generateCryptoComprehensiveAnalysis, ComprehensiveAnalysis } from "@/utils/comprehensiveAnalysis";
+import { fetchHistoricalData } from "@/utils/binanceAPI";
 
 export const ComprehensiveAnalysisComponent = () => {
   const [analysis, setAnalysis] = useState<ComprehensiveAnalysis | null>(null);
@@ -21,7 +21,8 @@ export const ComprehensiveAnalysisComponent = () => {
     setIsLoading(true);
     try {
       const apiKey = localStorage.getItem('gemini_api_key') || '';
-      const result = await generateComprehensiveAnalysis(apiKey);
+      const priceData = await fetchHistoricalData('ARBUSDT', '1h', 100);
+      const result = await generateCryptoComprehensiveAnalysis(priceData, apiKey);
       setAnalysis(result);
       toast.success("Phân tích tổng hợp đã được cập nhật!");
     } catch (error) {
@@ -32,7 +33,7 @@ export const ComprehensiveAnalysisComponent = () => {
     }
   };
 
-  const getSignalColor = (signal: string) => {
+  function getSignalColor(signal: string) {
     switch (signal) {
       case 'STRONG_BUY': return 'text-green-500 bg-green-500/10 border-green-500/20';
       case 'BUY': return 'text-green-400 bg-green-400/10 border-green-400/20';
@@ -40,21 +41,21 @@ export const ComprehensiveAnalysisComponent = () => {
       case 'SELL': return 'text-red-400 bg-red-400/10 border-red-400/20';
       default: return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
     }
-  };
+  }
 
-  const getRiskColor = (risk: string) => {
+  function getRiskColor(risk: string) {
     switch (risk) {
       case 'LOW': return 'text-green-400 bg-green-400/10';
       case 'HIGH': return 'text-red-400 bg-red-400/10';
       default: return 'text-yellow-400 bg-yellow-400/10';
     }
-  };
+  }
 
-  const getAccuracyColor = (accuracy: number) => {
+  function getAccuracyColor(accuracy: number) {
     if (accuracy >= 80) return 'text-green-400';
     if (accuracy >= 65) return 'text-yellow-400';
     return 'text-red-400';
-  };
+  }
 
   if (isLoading) {
     return (
@@ -159,9 +160,9 @@ export const ComprehensiveAnalysisComponent = () => {
             </div>
           </div>
           <div className="bg-slate-900/30 rounded-lg p-3">
-            <div className="text-sm text-slate-400 mb-1">Tin Tức</div>
+            <div className="text-sm text-slate-400 mb-1">Sentiment</div>
             <div className="text-lg font-semibold text-purple-400">
-              {analysis.newsScore}%
+              {analysis.sentimentScore}%
             </div>
           </div>
         </div>
@@ -181,7 +182,7 @@ export const ComprehensiveAnalysisComponent = () => {
 
         {/* Timestamp */}
         <div className="text-xs text-slate-500 text-center pt-2 border-t border-slate-700">
-          Cập nhật: {analysis.timestamp.toLocaleString('vi-VN')}
+          Cập nhật: {analysis.timestamp.toLocaleString('vi-VN')} | Dữ liệu: {analysis.liveDataUsed ? 'Live Binance' : 'Simulated'}
         </div>
 
         {/* Disclaimer */}
@@ -192,4 +193,28 @@ export const ComprehensiveAnalysisComponent = () => {
       </div>
     </Card>
   );
+
+  function getSignalColor(signal: string) {
+    switch (signal) {
+      case 'STRONG_BUY': return 'text-green-500 bg-green-500/10 border-green-500/20';
+      case 'BUY': return 'text-green-400 bg-green-400/10 border-green-400/20';
+      case 'STRONG_SELL': return 'text-red-500 bg-red-500/10 border-red-500/20';
+      case 'SELL': return 'text-red-400 bg-red-400/10 border-red-400/20';
+      default: return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
+    }
+  }
+
+  function getRiskColor(risk: string) {
+    switch (risk) {
+      case 'LOW': return 'text-green-400 bg-green-400/10';
+      case 'HIGH': return 'text-red-400 bg-red-400/10';
+      default: return 'text-yellow-400 bg-yellow-400/10';
+    }
+  }
+
+  function getAccuracyColor(accuracy: number) {
+    if (accuracy >= 80) return 'text-green-400';
+    if (accuracy >= 65) return 'text-yellow-400';
+    return 'text-red-400';
+  }
 };

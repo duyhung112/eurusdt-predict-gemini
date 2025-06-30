@@ -1,11 +1,11 @@
-
-import { generateComprehensiveAnalysis } from './comprehensiveAnalysis';
+import { generateCryptoComprehensiveAnalysis } from './comprehensiveAnalysis';
 import { analyzePatterns } from './patternRecognition';
 import { analyzeMarketStructure } from './marketStructure';
 import { analyzeAdvancedSentiment } from './advancedSentiment';
 import { analyzeSmartRisk } from './smartRiskManagement';
 import { analyzeEconomicCalendar } from './economicCalendar';
 import { runBacktest } from './backtesting';
+import { fetchHistoricalData } from './binanceAPI';
 
 export interface MasterAnalysis {
   overallSignal: 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL';
@@ -42,7 +42,7 @@ const generatePriceData = () => {
 
 export const generateMasterAnalysis = async (apiKey: string): Promise<MasterAnalysis> => {
   try {
-    const priceData = generatePriceData();
+    const priceData = await fetchHistoricalData('ARBUSDT', '1h', 100);
     
     // Run all analyses in parallel
     const [
@@ -54,11 +54,11 @@ export const generateMasterAnalysis = async (apiKey: string): Promise<MasterAnal
       calendar,
       backtest
     ] = await Promise.all([
-      generateComprehensiveAnalysis(apiKey),
+      generateCryptoComprehensiveAnalysis(priceData, apiKey),
       analyzePatterns(apiKey),
-      Promise.resolve(analyzeMarketStructure(priceData)),
-      analyzeAdvancedSentiment(apiKey),
-      Promise.resolve(analyzeSmartRisk(priceData)),
+      Promise.resolve(analyzeMarketStructure(generatePriceData())),
+      analyzeAdvancedSentiment(priceData, apiKey),
+      Promise.resolve(analyzeSmartRisk(generatePriceData())),
       analyzeEconomicCalendar(apiKey),
       runBacktest(apiKey)
     ]);
