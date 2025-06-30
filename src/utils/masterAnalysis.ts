@@ -5,7 +5,7 @@ import { analyzeAdvancedSentiment } from './advancedSentiment';
 import { analyzeSmartRisk } from './smartRiskManagement';
 import { analyzeEconomicCalendar } from './economicCalendar';
 import { runBacktest } from './backtesting';
-import { fetchHistoricalData } from './binanceAPI';
+import { fetchBinanceKlines } from './binanceAPI';
 
 export interface MasterAnalysis {
   overallSignal: 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL';
@@ -42,7 +42,7 @@ const generatePriceData = () => {
 
 export const generateMasterAnalysis = async (apiKey: string): Promise<MasterAnalysis> => {
   try {
-    const priceData = await fetchHistoricalData('ARBUSDT', '1h', 100);
+    const priceData = await fetchBinanceKlines('ARBUSDT', '1h', 100);
     
     // Run all analyses in parallel
     const [
