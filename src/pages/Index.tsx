@@ -6,9 +6,10 @@ import { AIPredictions } from "@/components/AIPredictions";
 import { TradingSignals } from "@/components/TradingSignals";
 import { NewsAnalysis } from "@/components/NewsAnalysis";
 import { ComprehensiveAnalysisComponent } from "@/components/ComprehensiveAnalysis";
+import { MasterAnalysisComponent } from "@/components/MasterAnalysisComponent";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Brain, Target, BarChart3, Newspaper, Zap } from "lucide-react";
+import { TrendingUp, Brain, Target, BarChart3, Newspaper, Zap, Crown } from "lucide-react";
 
 const Index = () => {
   const [marketData, setMarketData] = useState({
@@ -31,7 +32,7 @@ const Index = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">AI Trading Hub</h1>
-                <p className="text-sm text-blue-300">Forex Analysis & Predictions</p>
+                <p className="text-sm text-blue-300">Master AI Analysis System</p>
               </div>
             </div>
             <div className="flex items-center space-x-6">
@@ -74,15 +75,19 @@ const Index = () => {
           <div className="space-y-6">
             <TradingSignals />
             
-            <Tabs defaultValue="comprehensive" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-700">
+            <Tabs defaultValue="master" className="w-full">
+              <TabsList className="grid w-full grid-cols-5 bg-slate-800 border-slate-700">
+                <TabsTrigger value="master" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-blue-600">
+                  <Crown className="h-4 w-4 mr-2" />
+                  Master
+                </TabsTrigger>
                 <TabsTrigger value="comprehensive" className="data-[state=active]:bg-purple-600">
                   <Zap className="h-4 w-4 mr-2" />
                   Tổng Hợp
                 </TabsTrigger>
                 <TabsTrigger value="analysis" className="data-[state=active]:bg-blue-600">
                   <Brain className="h-4 w-4 mr-2" />
-                  AI Analysis
+                  Analysis
                 </TabsTrigger>
                 <TabsTrigger value="predictions" className="data-[state=active]:bg-blue-600">
                   <Target className="h-4 w-4 mr-2" />
@@ -93,6 +98,10 @@ const Index = () => {
                   News
                 </TabsTrigger>
               </TabsList>
+              
+              <TabsContent value="master" className="mt-4">
+                <MasterAnalysisComponent />
+              </TabsContent>
               
               <TabsContent value="comprehensive" className="mt-4">
                 <ComprehensiveAnalysisComponent />
