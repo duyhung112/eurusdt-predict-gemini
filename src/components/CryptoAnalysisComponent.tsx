@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { TrendingUp, TrendingDown, Activity, DollarSign, Target, AlertTriangle } from 'lucide-react';
 import { fetchBinanceKlines, fetch24hrStats, CryptoPriceData } from '@/utils/binanceAPI';
 import { analyzeCryptoTechnicals } from '@/utils/cryptoTechnicalAnalysis';
@@ -14,6 +13,7 @@ export const CryptoAnalysisComponent = () => {
   const [analysis, setAnalysis] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [livePrice, setLivePrice] = useState<number | null>(null);
 
   const symbol = 'ARBUSDT';
 
@@ -21,18 +21,23 @@ export const CryptoAnalysisComponent = () => {
     const initializeData = async () => {
       try {
         setIsLoading(true);
+        console.log('Fetching initial data for', symbol);
         
         // Fetch historical data
         const historicalData = await fetchBinanceKlines(symbol, '1h', 100);
+        console.log('Historical data loaded:', historicalData.length, 'candles');
         setPriceData(historicalData);
         
         // Fetch current stats
         const stats = await fetch24hrStats(symbol);
+        console.log('24hr stats loaded:', stats);
         setCurrentStats(stats);
+        setLivePrice(stats.price);
         
         // Perform analysis
         if (historicalData.length > 0) {
           const techAnalysis = analyzeCryptoTechnicals(historicalData);
+          console.log('Technical analysis completed:', techAnalysis.overallSignal);
           setAnalysis(techAnalysis);
         }
         
@@ -47,7 +52,9 @@ export const CryptoAnalysisComponent = () => {
 
     // Setup WebSocket for live updates
     const wsClient = createBinanceWebSocketClient(symbol, '1m', (newData) => {
+      console.log('Live price update:', newData.close);
       setPriceData(prev => [...prev.slice(-99), newData]);
+      setLivePrice(newData.close);
       setLastUpdate(new Date());
     });
 
@@ -86,7 +93,7 @@ export const CryptoAnalysisComponent = () => {
     return (
       <Card className="bg-slate-800/50 border-slate-700">
         <CardContent className="flex items-center justify-center p-8">
-          <div className="text-slate-400">Đang tải dữ liệu ARB/USDT...</div>
+          <div className="text-slate-400">Đang tải dữ liệu ARB/USDT từ Binance...</div>
         </CardContent>
       </Card>
     );
@@ -94,6 +101,24 @@ export const CryptoAnalysisComponent = () => {
 
   return (
     <div className="space-y-4">
+      {/* Live Data Status */}
+      <Card className="bg-slate-800/50 border-slate-700">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-400">
+              Dữ liệu thực từ Binance API
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-xs text-green-400">LIVE</span>
+            </div>
+          </div>
+          <div className="text-xs text-slate-500 mt-1">
+            Candles: {priceData.length} | Live Price: ${livePrice?.toFixed(4)}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Price Stats */}
       <Card className="bg-slate-800/50 border-slate-700">
         <CardHeader className="pb-3">
@@ -109,7 +134,7 @@ export const CryptoAnalysisComponent = () => {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <div className="text-2xl font-bold text-white">
-                  ${currentStats.price.toFixed(4)}
+                  ${(livePrice || currentStats.price).toFixed(4)}
                 </div>
                 <div className={`text-sm flex items-center ${
                   currentStats.change24h >= 0 ? 'text-green-400' : 'text-red-400'
@@ -134,7 +159,7 @@ export const CryptoAnalysisComponent = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Activity className="h-5 w-5 text-blue-400" />
-              <span className="text-white">AI Technical Analysis</span>
+              <span className="text-white">AI Technical Analysis (Live Data)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -216,7 +241,7 @@ export const CryptoAnalysisComponent = () => {
             <div className="mt-6 p-4 bg-blue-900/20 border border-blue-700/30 rounded-lg">
               <div className="flex items-center text-blue-400 mb-2">
                 <DollarSign className="h-4 w-4 mr-1" />
-                <span className="font-medium">Khuyến nghị giao dịch</span>
+                <span className="font-medium">Khuyến nghị giao dịch (Dữ liệu thực)</span>
               </div>
               <div className="text-white">
                 {analysis.overallSignal === 'STRONG_BUY' && analysis.confidence > 75 

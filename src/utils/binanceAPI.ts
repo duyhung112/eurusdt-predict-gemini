@@ -1,4 +1,3 @@
-
 const BINANCE_API_KEY = 'QVQKD8Yqyzje8nSF1tM4Qc2PiVMTwSUeNrIPl7HMseL5KZQhZwUl61ynYSTwYAtl';
 const BINANCE_BASE_URL = 'https://api.binance.com/api/v3';
 
@@ -33,17 +32,13 @@ export const fetchBinanceKlines = async (
   try {
     const url = `${BINANCE_BASE_URL}/klines?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
     
-    const response = await fetch(url, {
-      headers: {
-        'X-MBX-APIKEY': BINANCE_API_KEY
-      }
-    });
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`Binance API error: ${response.status}`);
     }
 
-    const data: BinanceKline[] = await response.json();
+    const data: any[][] = await response.json();
     
     return data.map((kline) => ({
       timestamp: kline[6], // closeTime
