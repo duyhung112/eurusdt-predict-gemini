@@ -1,19 +1,24 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Activity, DollarSign, Target, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { TrendingUp, TrendingDown, Activity, DollarSign, Target, AlertTriangle, Brain, Database } from 'lucide-react';
 import { fetchBinanceKlines, fetch24hrStats, CryptoPriceData } from '@/utils/binanceAPI';
 import { analyzeCryptoTechnicals } from '@/utils/cryptoTechnicalAnalysis';
+import { generateCryptoComprehensiveAnalysis, ComprehensiveAnalysis } from '@/utils/comprehensiveAnalysis';
 import { createBinanceWebSocketClient } from '@/utils/binanceWebSocket';
 
 export const CryptoAnalysisComponent = () => {
   const [priceData, setPriceData] = useState<CryptoPriceData[]>([]);
   const [currentStats, setCurrentStats] = useState<any>(null);
   const [analysis, setAnalysis] = useState<any>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<ComprehensiveAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const symbol = 'ARBUSDT';
 
@@ -34,7 +39,7 @@ export const CryptoAnalysisComponent = () => {
         setCurrentStats(stats);
         setLivePrice(stats.price);
         
-        // Perform analysis
+        // Perform technical analysis
         if (historicalData.length > 0) {
           const techAnalysis = analyzeCryptoTechnicals(historicalData);
           console.log('Technical analysis completed:', techAnalysis.overallSignal);
@@ -73,6 +78,31 @@ export const CryptoAnalysisComponent = () => {
     }
   }, [priceData]);
 
+  const handleAIAnalysis = async () => {
+    if (!geminiApiKey.trim()) {
+      alert('Vui lòng nhập Gemini API key');
+      return;
+    }
+
+    if (priceData.length < 20) {
+      alert('Cần thêm dữ liệu để phân tích AI');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      console.log('Starting AI analysis with live Binance data:', priceData.length, 'candles');
+      const comprehensiveAnalysis = await generateCryptoComprehensiveAnalysis(priceData, geminiApiKey);
+      console.log('AI analysis completed:', comprehensiveAnalysis);
+      setAiAnalysis(comprehensiveAnalysis);
+    } catch (error) {
+      console.error('AI analysis failed:', error);
+      alert('AI phân tích thất bại. Kiểm tra API key.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const getSignalColor = (signal: string) => {
     switch (signal) {
       case 'STRONG_BUY': return 'bg-green-600';
@@ -105,8 +135,9 @@ export const CryptoAnalysisComponent = () => {
       <Card className="bg-slate-800/50 border-slate-700">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <div className="text-sm text-slate-400">
-              Dữ liệu thực từ Binance API
+            <div className="flex items-center space-x-2">
+              <Database className="h-4 w-4 text-green-400" />
+              <span className="text-sm text-slate-400">Dữ liệu thực từ Binance API</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -114,7 +145,89 @@ export const CryptoAnalysisComponent = () => {
             </div>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            Candles: {priceData.length} | Live Price: ${livePrice?.toFixed(4)}
+            Candles: {priceData.length} | Live Price: ${livePrice?.toFixed(4)} | Last Update: {lastUpdate.toLocaleTimeString()}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Analysis Section */}
+      <Card className="bg-slate-800/50 border-slate-700">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Brain className="h-5 w-5 text-purple-400" />
+            <span className="text-white">AI Analysis (Gemini)</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex space-x-2">
+              <Input
+                type="password"
+                placeholder="Nhập Gemini API Key"
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+              <Button 
+                onClick={handleAIAnalysis} 
+                disabled={isAnalyzing || !geminiApiKey.trim()}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {isAnalyzing ? 'Đang phân tích...' : 'Phân tích AI'}
+              </Button>
+            </div>
+            
+            {aiAnalysis && (
+              <div className="space-y-4 mt-4 p-4 bg-slate-700/30 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Badge className={`${getSignalColor(aiAnalysis.overallSignal)} text-white`}>
+                      {getSignalIcon(aiAnalysis.overallSignal)}
+                      <span className="ml-1">{aiAnalysis.overallSignal}</span>
+                    </Badge>
+                    {aiAnalysis.liveDataUsed && (
+                      <Badge variant="outline" className="text-green-400 border-green-400">
+                        <Database className="h-3 w-3 mr-1" />
+                        Live Data
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-slate-300">Tin cậy: {aiAnalysis.confidenceScore}%</div>
+                    <div className="text-sm text-slate-300">Độ chính xác: {aiAnalysis.accuracyScore}%</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-slate-400">Technical Score</div>
+                    <div className="text-lg font-bold text-white">{aiAnalysis.technicalScore}/100</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-400">Sentiment Score</div>
+                    <div className="text-lg font-bold text-white">{aiAnalysis.sentimentScore}/100</div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-sm text-slate-400">Reasoning (từ dữ liệu thực):</div>
+                  {aiAnalysis.reasoning.map((reason, i) => (
+                    <div key={i} className="text-sm text-slate-300">• {reason}</div>
+                  ))}
+                </div>
+
+                <div className="p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg">
+                  <div className="flex items-center text-blue-400 mb-2">
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    <span className="font-medium">AI Recommendation</span>
+                  </div>
+                  <div className="text-white text-sm">{aiAnalysis.recommendation}</div>
+                  <div className="text-slate-400 text-xs mt-1">
+                    Risk: {aiAnalysis.riskLevel} | Strategy: {aiAnalysis.entryStrategy}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -153,13 +266,13 @@ export const CryptoAnalysisComponent = () => {
         </CardContent>
       </Card>
 
-      {/* AI Analysis */}
+      {/* Technical Analysis */}
       {analysis && (
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Activity className="h-5 w-5 text-blue-400" />
-              <span className="text-white">AI Technical Analysis (Live Data)</span>
+              <span className="text-white">Technical Analysis (Live Data)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -212,48 +325,6 @@ export const CryptoAnalysisComponent = () => {
                 <div className="text-white font-bold">
                   ${analysis.priceTarget.bearish.toFixed(4)}
                 </div>
-              </div>
-            </div>
-
-            {/* Support/Resistance */}
-            {(analysis.supportResistance.support.length > 0 || analysis.supportResistance.resistance.length > 0) && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-slate-400 mb-2">Support Levels</div>
-                  {analysis.supportResistance.support.map((level: number, i: number) => (
-                    <div key={i} className="text-green-400 text-sm">
-                      ${level.toFixed(4)}
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div className="text-sm text-slate-400 mb-2">Resistance Levels</div>
-                  {analysis.supportResistance.resistance.map((level: number, i: number) => (
-                    <div key={i} className="text-red-400 text-sm">
-                      ${level.toFixed(4)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Trading Recommendation */}
-            <div className="mt-6 p-4 bg-blue-900/20 border border-blue-700/30 rounded-lg">
-              <div className="flex items-center text-blue-400 mb-2">
-                <DollarSign className="h-4 w-4 mr-1" />
-                <span className="font-medium">Khuyến nghị giao dịch (Dữ liệu thực)</span>
-              </div>
-              <div className="text-white">
-                {analysis.overallSignal === 'STRONG_BUY' && analysis.confidence > 75 
-                  ? `Khuyến nghị MUA mạnh với độ tin cậy ${analysis.confidence.toFixed(0)}%. Đặt stop loss dưới ${analysis.supportResistance.support[0]?.toFixed(4) || 'support gần nhất'}.`
-                  : analysis.overallSignal === 'BUY' && analysis.confidence > 65
-                  ? `Khuyến nghị MUA với độ tin cậy ${analysis.confidence.toFixed(0)}%. Quản lý rủi ro cẩn thận.`
-                  : analysis.overallSignal === 'STRONG_SELL' && analysis.confidence > 75
-                  ? `Khuyến nghị BÁN mạnh với độ tin cậy ${analysis.confidence.toFixed(0)}%. Đặt stop loss trên ${analysis.supportResistance.resistance[0]?.toFixed(4) || 'resistance gần nhất'}.`
-                  : analysis.overallSignal === 'SELL' && analysis.confidence > 65
-                  ? `Khuyến nghị BÁN với độ tin cậy ${analysis.confidence.toFixed(0)}%. Quản lý rủi ro cẩn thận.`
-                  : `Tín hiệu TRUNG TÍNH. Chờ đợi tín hiệu rõ ràng hơn trước khi vào lệnh. Độ tin cậy hiện tại: ${analysis.confidence.toFixed(0)}%.`
-                }
               </div>
             </div>
           </CardContent>

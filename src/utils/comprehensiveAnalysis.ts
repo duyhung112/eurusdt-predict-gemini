@@ -1,6 +1,9 @@
 
 import { analyzeNewsWithAI } from './newsAnalysis';
 import { calculateTechnicalIndicators } from './technicalIndicators';
+import { CryptoPriceData } from './binanceAPI';
+import { analyzeCryptoTechnicals } from './cryptoTechnicalAnalysis';
+import { analyzeAdvancedSentiment } from './advancedSentiment';
 
 export interface ComprehensiveAnalysis {
   overallSignal: 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL';
@@ -9,134 +12,118 @@ export interface ComprehensiveAnalysis {
   recommendation: string;
   reasoning: string[];
   technicalScore: number;
-  newsScore: number;
+  sentimentScore: number;
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
   shouldEnterTrade: boolean;
   entryStrategy: string;
   timestamp: Date;
+  liveDataUsed: boolean;
 }
 
-interface AnalysisWeights {
-  technical: number;
-  news: number;
-  volume: number;
-  trend: number;
-}
-
-const defaultWeights: AnalysisWeights = {
-  technical: 0.4,
-  news: 0.3,
-  volume: 0.15,
-  trend: 0.15
-};
-
-export const generateComprehensiveAnalysis = async (
-  apiKey: string,
-  weights: AnalysisWeights = defaultWeights
+export const generateCryptoComprehensiveAnalysis = async (
+  priceData: CryptoPriceData[],
+  apiKey: string
 ): Promise<ComprehensiveAnalysis> => {
   try {
-    // Get technical analysis
-    const technicalData = calculateTechnicalIndicators();
-    const technicalScore = technicalData.overallScore;
-
-    // Get news analysis
-    const newsAnalysis = await analyzeNewsWithAI(apiKey);
-    const newsScore = calculateNewsScore(newsAnalysis.sentiment, newsAnalysis.confidence);
-
-    // Calculate volume and trend scores
-    const volumeScore = calculateVolumeScore();
-    const trendScore = calculateTrendScore();
-
-    // Calculate weighted overall score
-    const weightedScore = 
-      (technicalScore * weights.technical) +
-      (newsScore * weights.news) +
-      (volumeScore * weights.volume) +
-      (trendScore * weights.trend);
-
-    // Determine signal strength
-    const signal = determineSignal(weightedScore);
+    console.log('Generating comprehensive analysis with live Binance data:', priceData.length, 'candles');
     
-    // Calculate confidence and accuracy
-    const confidence = calculateConfidence(technicalScore, newsScore, volumeScore, trendScore);
-    const accuracy = calculateAccuracyScore(signal, confidence, technicalData.indicators.length);
-
-    // Generate reasoning
-    const reasoning = generateReasoning(technicalData, newsAnalysis, signal, confidence);
-
-    // Determine if should enter trade
-    const shouldEnter = shouldEnterTrade(signal, confidence, accuracy);
-
-    // Calculate risk level
-    const riskLevel = calculateRiskLevel(signal, confidence, newsAnalysis.sentiment);
-
+    // Analyze using real Binance price data
+    const technicalAnalysis = analyzeCryptoTechnicals(priceData);
+    const sentimentAnalysis = await analyzeAdvancedSentiment(priceData, apiKey);
+    
+    // Calculate scores based on real data
+    const technicalScore = calculateTechnicalScore(technicalAnalysis);
+    const sentimentScore = calculateSentimentScore(sentimentAnalysis);
+    
+    // Weighted overall score using real data
+    const weightedScore = (technicalScore * 0.6) + (sentimentScore * 0.4);
+    
+    // Determine signal strength
+    const signal = determineSignalFromScore(weightedScore);
+    
+    // Calculate confidence based on data quality and consensus
+    const confidence = calculateRealDataConfidence(technicalAnalysis, sentimentAnalysis, priceData.length);
+    
+    // Calculate accuracy based on real data quality
+    const accuracy = calculateAccuracyFromRealData(signal, confidence, priceData.length);
+    
+    // Generate reasoning based on actual analysis
+    const reasoning = generateReasoningFromRealData(technicalAnalysis, sentimentAnalysis);
+    
+    // Risk assessment based on real volatility and market conditions
+    const riskLevel = calculateRealRiskLevel(priceData, technicalAnalysis.confidence);
+    
+    // Entry decision based on real data quality
+    const shouldEnter = shouldEnterBasedOnRealData(signal, confidence, accuracy, riskLevel);
+    
+    console.log('Comprehensive analysis completed:', {
+      signal,
+      confidence,
+      technicalScore,
+      sentimentScore,
+      liveDataUsed: true
+    });
+    
     return {
       overallSignal: signal,
       confidenceScore: Math.round(confidence),
       accuracyScore: Math.round(accuracy),
-      recommendation: generateRecommendation(signal, confidence, shouldEnter),
+      recommendation: generateRecommendationFromRealData(signal, confidence, shouldEnter),
       reasoning,
       technicalScore: Math.round(technicalScore),
-      newsScore: Math.round(newsScore),
+      sentimentScore: Math.round(sentimentScore),
       riskLevel,
       shouldEnterTrade: shouldEnter,
-      entryStrategy: generateEntryStrategy(signal, confidence, riskLevel),
-      timestamp: new Date()
+      entryStrategy: generateEntryStrategyFromRealData(signal, confidence, riskLevel),
+      timestamp: new Date(),
+      liveDataUsed: true
     };
 
   } catch (error) {
     console.error('Comprehensive analysis error:', error);
     
-    // Fallback analysis
-    const fallbackTechnical = calculateTechnicalIndicators();
+    // Fallback with technical analysis only
+    const fallbackTechnical = priceData.length > 0 ? analyzeCryptoTechnicals(priceData) : null;
+    
     return {
       overallSignal: 'NEUTRAL',
-      confidenceScore: 50,
-      accuracyScore: 65,
-      recommendation: 'Wait for clearer signals before entering any trades.',
-      reasoning: ['Technical analysis only available', 'News analysis unavailable'],
-      technicalScore: fallbackTechnical.overallScore,
-      newsScore: 50,
-      riskLevel: 'MEDIUM',
+      confidenceScore: 40,
+      accuracyScore: 50,
+      recommendation: 'Không thể phân tích đầy đủ. Chờ đợi dữ liệu tốt hơn.',
+      reasoning: ['Lỗi kết nối API', 'Chỉ sử dụng dữ liệu kỹ thuật cơ bản'],
+      technicalScore: fallbackTechnical ? fallbackTechnical.confidence : 50,
+      sentimentScore: 50,
+      riskLevel: 'HIGH',
       shouldEnterTrade: false,
-      entryStrategy: 'Wait for better market conditions',
-      timestamp: new Date()
+      entryStrategy: 'Chờ đợi tín hiệu rõ ràng hơn',
+      timestamp: new Date(),
+      liveDataUsed: priceData.length > 0
     };
   }
 };
 
-const calculateNewsScore = (sentiment: string, confidence: number): number => {
-  const baseScore = 50;
-  
-  switch (sentiment) {
-    case 'BULLISH':
-      return Math.min(95, baseScore + (confidence * 0.4));
-    case 'BEARISH':
-      return Math.max(5, baseScore - (confidence * 0.4));
-    default:
-      return baseScore;
+const calculateTechnicalScore = (analysis: any): number => {
+  // Convert technical analysis to score
+  switch (analysis.overallSignal) {
+    case 'STRONG_BUY': return 90;
+    case 'BUY': return 75;
+    case 'SELL': return 25;
+    case 'STRONG_SELL': return 10;
+    default: return 50;
   }
 };
 
-const calculateVolumeScore = (): number => {
-  // Mock volume analysis - in real implementation, use actual volume data
-  const currentVolume = 1200000 + Math.random() * 800000;
-  const avgVolume = 1200000;
-  const volumeRatio = currentVolume / avgVolume;
+const calculateSentimentScore = (sentiment: any): number => {
+  const baseScore = sentiment.confidence;
   
-  if (volumeRatio > 1.5) return 85; // High volume = strong signal
-  if (volumeRatio > 1.2) return 70;
-  if (volumeRatio < 0.8) return 40; // Low volume = weak signal
-  return 60;
+  switch (sentiment.overallSentiment) {
+    case 'BULLISH': return Math.min(95, baseScore + 20);
+    case 'BEARISH': return Math.max(5, baseScore - 20);
+    default: return baseScore;
+  }
 };
 
-const calculateTrendScore = (): number => {
-  // Mock trend analysis - in real implementation, use price action data
-  const trendStrength = 60 + Math.random() * 30;
-  return trendStrength;
-};
-
-const determineSignal = (score: number): 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL' => {
+const determineSignalFromScore = (score: number): 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL' => {
   if (score >= 85) return 'STRONG_BUY';
   if (score >= 70) return 'BUY';
   if (score <= 15) return 'STRONG_SELL';
@@ -144,109 +131,115 @@ const determineSignal = (score: number): 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SEL
   return 'NEUTRAL';
 };
 
-const calculateConfidence = (technical: number, news: number, volume: number, trend: number): number => {
-  const scores = [technical, news, volume, trend];
-  const average = scores.reduce((a, b) => a + b) / scores.length;
-  const variance = scores.reduce((sum, score) => sum + Math.pow(score - average, 2), 0) / scores.length;
-  const consistency = Math.max(0, 100 - variance);
+const calculateRealDataConfidence = (technical: any, sentiment: any, dataPoints: number): number => {
+  // Base confidence on data quality
+  let confidence = Math.min(95, 40 + (dataPoints * 0.5));
   
-  return Math.min(95, (average + consistency) / 2);
+  // Boost if technical and sentiment agree
+  if ((technical.overallSignal.includes('BUY') && sentiment.overallSentiment === 'BULLISH') ||
+      (technical.overallSignal.includes('SELL') && sentiment.overallSentiment === 'BEARISH')) {
+    confidence += 15;
+  }
+  
+  // Boost based on technical confidence
+  confidence += (technical.confidence * 0.2);
+  
+  return Math.min(95, confidence);
 };
 
-const calculateAccuracyScore = (signal: string, confidence: number, indicatorCount: number): number => {
-  let baseAccuracy = 65;
+const calculateAccuracyFromRealData = (signal: string, confidence: number, dataPoints: number): number => {
+  let accuracy = 55;
   
-  // Boost accuracy based on signal strength
-  if (signal.includes('STRONG')) baseAccuracy += 15;
-  else if (signal !== 'NEUTRAL') baseAccuracy += 8;
+  // More data points = higher accuracy
+  if (dataPoints >= 50) accuracy += 15;
+  else if (dataPoints >= 20) accuracy += 10;
   
-  // Boost based on confidence
-  if (confidence > 80) baseAccuracy += 10;
-  else if (confidence > 60) baseAccuracy += 5;
+  // Strong signals = higher accuracy
+  if (signal.includes('STRONG')) accuracy += 10;
+  else if (signal !== 'NEUTRAL') accuracy += 5;
   
-  // Boost based on indicator consensus
-  if (indicatorCount >= 4) baseAccuracy += 5;
+  // High confidence = higher accuracy
+  if (confidence > 80) accuracy += 10;
+  else if (confidence > 60) accuracy += 5;
   
-  return Math.min(95, Math.max(45, baseAccuracy));
+  return Math.min(95, accuracy);
 };
 
-const generateReasoning = (technical: any, news: any, signal: string, confidence: number): string[] => {
+const generateReasoningFromRealData = (technical: any, sentiment: any): string[] => {
   const reasons: string[] = [];
   
   // Technical reasoning
-  const buySignals = technical.indicators.filter((i: any) => i.signal === 'BUY').length;
-  const sellSignals = technical.indicators.filter((i: any) => i.signal === 'SELL').length;
+  reasons.push(`Phân tích kỹ thuật: ${technical.overallSignal} (${technical.confidence.toFixed(0)}% tin cậy)`);
   
-  if (buySignals > sellSignals) {
-    reasons.push(`${buySignals} technical indicators show BUY signals`);
-  } else if (sellSignals > buySignals) {
-    reasons.push(`${sellSignals} technical indicators show SELL signals`);
+  // Sentiment reasoning
+  reasons.push(`AI sentiment: ${sentiment.overallSentiment} từ ${sentiment.sources.length} nguồn`);
+  
+  // Price action reasoning
+  if (sentiment.priceAnalysis) {
+    reasons.push(`Xu hướng giá: ${sentiment.priceAnalysis.trend}, Momentum: ${sentiment.priceAnalysis.momentum}`);
   }
   
-  // News reasoning
-  if (news.sentiment !== 'NEUTRAL') {
-    reasons.push(`Economic news sentiment is ${news.sentiment.toLowerCase()}`);
+  // Volume reasoning
+  const volumeIndicator = technical.indicators.find((i: any) => i.name === 'Volume');
+  if (volumeIndicator) {
+    reasons.push(`Volume: ${volumeIndicator.signal} (${volumeIndicator.value.toFixed(2)}x trung bình)`);
   }
   
-  // Confidence reasoning
-  if (confidence > 75) {
-    reasons.push('High confidence due to indicator consensus');
-  } else if (confidence < 50) {
-    reasons.push('Low confidence due to mixed signals');
-  }
-  
-  // Signal reasoning
-  if (signal.includes('STRONG')) {
-    reasons.push('Strong signal suggests high probability move');
-  }
-  
-  return reasons.slice(0, 4); // Limit to 4 most important reasons
+  return reasons.slice(0, 4);
 };
 
-const shouldEnterTrade = (signal: string, confidence: number, accuracy: number): boolean => {
-  if (signal === 'NEUTRAL') return false;
-  if (confidence < 60) return false;
-  if (accuracy < 65) return false;
-  if (signal.includes('STRONG') && confidence > 75 && accuracy > 75) return true;
-  if (confidence > 70 && accuracy > 70) return true;
-  return false;
-};
-
-const calculateRiskLevel = (signal: string, confidence: number, newsSentiment: string): 'LOW' | 'MEDIUM' | 'HIGH' => {
-  if (signal === 'NEUTRAL' || confidence < 50) return 'HIGH';
-  if (signal.includes('STRONG') && confidence > 80) return 'LOW';
-  if (newsSentiment === 'NEUTRAL' && confidence < 70) return 'HIGH';
+const calculateRealRiskLevel = (priceData: CryptoPriceData[], technicalConfidence: number): 'LOW' | 'MEDIUM' | 'HIGH' => {
+  if (priceData.length < 10) return 'HIGH';
+  
+  // Calculate real volatility from price data
+  const closes = priceData.slice(-20).map(d => d.close);
+  const returns = closes.slice(1).map((price, i) => (price - closes[i]) / closes[i]);
+  const volatility = Math.sqrt(returns.reduce((sum, ret) => sum + ret * ret, 0) / returns.length);
+  
+  if (volatility > 0.05) return 'HIGH';
+  if (volatility > 0.02) return 'MEDIUM';
+  if (technicalConfidence > 75) return 'LOW';
+  
   return 'MEDIUM';
 };
 
-const generateRecommendation = (signal: string, confidence: number, shouldEnter: boolean): string => {
+const shouldEnterBasedOnRealData = (signal: string, confidence: number, accuracy: number, riskLevel: string): boolean => {
+  if (signal === 'NEUTRAL') return false;
+  if (confidence < 65) return false;
+  if (accuracy < 70) return false;
+  if (riskLevel === 'HIGH' && !signal.includes('STRONG')) return false;
+  
+  return true;
+};
+
+const generateRecommendationFromRealData = (signal: string, confidence: number, shouldEnter: boolean): string => {
   if (!shouldEnter) {
-    return 'Không nên vào lệnh lúc này. Chờ tín hiệu rõ ràng hơn.';
+    return `Không nên vào lệnh. Tín hiệu ${signal} với ${confidence}% tin cậy chưa đủ mạnh.`;
   }
   
   if (signal.includes('BUY')) {
-    const strength = signal.includes('STRONG') ? 'mạnh' : 'vừa phải';
-    return `Khuyến nghị MUA với tín hiệu ${strength}. Độ tin cậy ${confidence}%.`;
-  } 
-  
-  if (signal.includes('SELL')) {
-    const strength = signal.includes('STRONG') ? 'mạnh' : 'vừa phải';
-    return `Khuyến nghị BÁN với tín hiệu ${strength}. Độ tin cậy ${confidence}%.`;
+    const strength = signal.includes('STRONG') ? 'rất mạnh' : 'khá tốt';
+    return `Khuyến nghị MUA - Tín hiệu ${strength}, tin cậy ${confidence}%.`;
   }
   
-  return 'Tín hiệu trung tính. Quan sát thêm trước khi quyết định.';
+  if (signal.includes('SELL')) {
+    const strength = signal.includes('STRONG') ? 'rất mạnh' : 'khá tốt';
+    return `Khuyến nghị BÁN - Tín hiệu ${strength}, tin cậy ${confidence}%.`;
+  }
+  
+  return `Tín hiệu ${signal} - Quan sát thêm với tin cậy ${confidence}%.`;
 };
 
-const generateEntryStrategy = (signal: string, confidence: number, riskLevel: string): string => {
-  if (signal === 'NEUTRAL' || confidence < 60) {
-    return 'Chờ đợi tín hiệu rõ ràng hơn';
+const generateEntryStrategyFromRealData = (signal: string, confidence: number, riskLevel: string): string => {
+  if (signal === 'NEUTRAL' || confidence < 65) {
+    return 'Chờ đợi tín hiệu rõ ràng hơn từ dữ liệu thực';
   }
   
   const riskText = riskLevel === 'LOW' ? 'thấp' : riskLevel === 'MEDIUM' ? 'trung bình' : 'cao';
   
-  if (signal.includes('STRONG')) {
-    return `Vào lệnh với volume tiêu chuẩn. Rủi ro ${riskText}.`;
+  if (signal.includes('STRONG') && confidence > 80) {
+    return `Vào lệnh với volume chuẩn. Rủi ro ${riskText}. Dữ liệu Binance real-time.`;
   }
   
-  return `Vào lệnh với volume nhỏ để test. Rủi ro ${riskText}.`;
+  return `Vào lệnh thử nghiệm với volume nhỏ. Rủi ro ${riskText}. Theo dõi live data.`;
 };

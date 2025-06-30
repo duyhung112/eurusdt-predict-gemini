@@ -1,4 +1,6 @@
 
+import { CryptoPriceData } from './binanceAPI';
+
 interface SentimentData {
   source: string;
   sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
@@ -7,203 +9,210 @@ interface SentimentData {
   timestamp: Date;
 }
 
-interface COTData {
-  commercials: {
-    long: number;
-    short: number;
-    net: number;
-  };
-  nonCommercials: {
-    long: number;
-    short: number;
-    net: number;
-  };
-  sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-}
-
 interface AdvancedSentimentAnalysis {
   overallSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
   confidence: number;
   sources: SentimentData[];
-  cotData: COTData;
-  institutionalPositioning: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-  retailSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-  contrarian: boolean;
   recommendation: string;
+  priceAnalysis: {
+    trend: string;
+    momentum: string;
+    volatility: number;
+  };
 }
 
-const generateMockSentimentData = (): SentimentData[] => {
-  const sources = [
-    { name: 'Twitter Forex', weight: 0.3 },
-    { name: 'Reddit Trading', weight: 0.25 },
-    { name: 'News Sentiment', weight: 0.35 },
-    { name: 'Analyst Reports', weight: 0.1 }
+const analyzePriceAction = (priceData: CryptoPriceData[]): { trend: string; momentum: string; volatility: number } => {
+  if (priceData.length < 10) {
+    return { trend: 'INSUFFICIENT_DATA', momentum: 'NEUTRAL', volatility: 0 };
+  }
+
+  const closes = priceData.map(d => d.close);
+  const recent = closes.slice(-10);
+  const older = closes.slice(-20, -10);
+  
+  const recentAvg = recent.reduce((a, b) => a + b) / recent.length;
+  const olderAvg = older.reduce((a, b) => a + b) / older.length;
+  
+  const trendDirection = recentAvg > olderAvg ? 'BULLISH' : recentAvg < olderAvg ? 'BEARISH' : 'NEUTRAL';
+  
+  // Calculate momentum using rate of change
+  const currentPrice = closes[closes.length - 1];
+  const previousPrice = closes[closes.length - 5];
+  const momentum = (currentPrice - previousPrice) / previousPrice;
+  
+  const momentumStr = momentum > 0.02 ? 'STRONG_BULLISH' : 
+                     momentum > 0.005 ? 'BULLISH' :
+                     momentum < -0.02 ? 'STRONG_BEARISH' :
+                     momentum < -0.005 ? 'BEARISH' : 'NEUTRAL';
+  
+  // Calculate volatility
+  const returns = closes.slice(1).map((price, i) => (price - closes[i]) / closes[i]);
+  const volatility = Math.sqrt(returns.reduce((sum, ret) => sum + ret * ret, 0) / returns.length);
+  
+  return { trend: trendDirection, momentum: momentumStr, volatility };
+};
+
+const generateAIPriceSentiment = async (priceData: CryptoPriceData[], apiKey: string): Promise<SentimentData[]> => {
+  const priceAnalysis = analyzePriceAction(priceData);
+  
+  try {
+    if (!apiKey || apiKey.length < 10) {
+      throw new Error('Invalid API key');
+    }
+
+    const currentPrice = priceData[priceData.length - 1]?.close || 0;
+    const previousPrice = priceData[priceData.length - 24]?.close || currentPrice;
+    const priceChange = ((currentPrice - previousPrice) / previousPrice) * 100;
+    
+    const volumes = priceData.slice(-10).map(d => d.volume);
+    const avgVolume = volumes.reduce((a, b) => a + b) / volumes.length;
+    const currentVolume = volumes[volumes.length - 1];
+    
+    const prompt = `Analyze ARBUSDT crypto data:
+Price: $${currentPrice.toFixed(4)}
+24h Change: ${priceChange.toFixed(2)}%
+Trend: ${priceAnalysis.trend}
+Momentum: ${priceAnalysis.momentum}
+Volatility: ${(priceAnalysis.volatility * 100).toFixed(2)}%
+Volume Ratio: ${(currentVolume / avgVolume).toFixed(2)}x
+
+Provide sentiment analysis (BULLISH/BEARISH/NEUTRAL) with confidence 0-100. Be concise.`;
+
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: { 
+          temperature: 0.3, 
+          maxOutputTokens: 200 
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    // Parse AI response for sentiment
+    let sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+    let confidence = 60;
+    
+    if (aiResponse.toUpperCase().includes('BULLISH')) {
+      sentiment = 'BULLISH';
+      confidence = 75;
+    } else if (aiResponse.toUpperCase().includes('BEARISH')) {
+      sentiment = 'BEARISH';
+      confidence = 75;
+    }
+    
+    return [{
+      source: 'Gemini AI Analysis',
+      sentiment,
+      confidence,
+      impact: 'HIGH',
+      timestamp: new Date()
+    }];
+
+  } catch (error) {
+    console.error('AI sentiment analysis failed:', error);
+    
+    // Fallback to price action analysis
+    let sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+    let confidence = 50;
+    
+    if (priceAnalysis.trend === 'BULLISH' && priceAnalysis.momentum.includes('BULLISH')) {
+      sentiment = 'BULLISH';
+      confidence = 70;
+    } else if (priceAnalysis.trend === 'BEARISH' && priceAnalysis.momentum.includes('BEARISH')) {
+      sentiment = 'BEARISH';
+      confidence = 70;
+    }
+    
+    return [{
+      source: 'Price Action Analysis',
+      sentiment,
+      confidence,
+      impact: 'MEDIUM',
+      timestamp: new Date()
+    }];
+  }
+};
+
+export const analyzeAdvancedSentiment = async (priceData: CryptoPriceData[], apiKey: string): Promise<AdvancedSentimentAnalysis> => {
+  const priceAnalysis = analyzePriceAction(priceData);
+  const aiSentiment = await generateAIPriceSentiment(priceData, apiKey);
+  
+  // Combine technical and AI sentiment
+  const sources: SentimentData[] = [
+    ...aiSentiment,
+    {
+      source: 'Technical Analysis',
+      sentiment: priceAnalysis.trend as 'BULLISH' | 'BEARISH' | 'NEUTRAL',
+      confidence: priceAnalysis.volatility < 0.02 ? 80 : 60,
+      impact: 'HIGH',
+      timestamp: new Date()
+    }
   ];
   
-  return sources.map(source => {
-    const sentiments: ('BULLISH' | 'BEARISH' | 'NEUTRAL')[] = ['BULLISH', 'BEARISH', 'NEUTRAL'];
-    const impacts: ('HIGH' | 'MEDIUM' | 'LOW')[] = ['HIGH', 'MEDIUM', 'LOW'];
-    
-    return {
-      source: source.name,
-      sentiment: sentiments[Math.floor(Math.random() * sentiments.length)],
-      confidence: 60 + Math.random() * 30,
-      impact: impacts[Math.floor(Math.random() * impacts.length)],
-      timestamp: new Date(Date.now() - Math.random() * 86400000)
-    };
-  });
-};
-
-const generateMockCOTData = (): COTData => {
-  const commercialsNet = (Math.random() - 0.5) * 100000;
-  const nonCommercialsNet = (Math.random() - 0.5) * 80000;
-  
-  let sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-  
-  // COT analysis: when commercials are net long, it's usually bullish
-  if (commercialsNet > 20000) {
-    sentiment = 'BULLISH';
-  } else if (commercialsNet < -20000) {
-    sentiment = 'BEARISH';
-  } else {
-    sentiment = 'NEUTRAL';
-  }
-  
-  return {
-    commercials: {
-      long: 150000 + Math.random() * 50000,
-      short: 150000 - commercialsNet + Math.random() * 50000,
-      net: commercialsNet
-    },
-    nonCommercials: {
-      long: 120000 + Math.random() * 40000,
-      short: 120000 - nonCommercialsNet + Math.random() * 40000,
-      net: nonCommercialsNet
-    },
-    sentiment
-  };
-};
-
-const calculateWeightedSentiment = (sentimentData: SentimentData[]): { sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL'; confidence: number } => {
+  // Calculate overall sentiment
   let bullishScore = 0;
   let bearishScore = 0;
   let totalWeight = 0;
-  let avgConfidence = 0;
   
-  sentimentData.forEach(data => {
-    const weight = data.impact === 'HIGH' ? 1.0 : data.impact === 'MEDIUM' ? 0.7 : 0.4;
-    totalWeight += weight;
-    avgConfidence += data.confidence * weight;
+  sources.forEach(source => {
+    const weight = source.impact === 'HIGH' ? 1.0 : 0.7;
+    const confidenceWeight = source.confidence / 100;
+    const finalWeight = weight * confidenceWeight;
     
-    if (data.sentiment === 'BULLISH') {
-      bullishScore += weight * (data.confidence / 100);
-    } else if (data.sentiment === 'BEARISH') {
-      bearishScore += weight * (data.confidence / 100);
+    totalWeight += finalWeight;
+    
+    if (source.sentiment === 'BULLISH') {
+      bullishScore += finalWeight;
+    } else if (source.sentiment === 'BEARISH') {
+      bearishScore += finalWeight;
     }
   });
   
   const totalScore = bullishScore + bearishScore;
-  if (totalScore === 0) {
-    return { sentiment: 'NEUTRAL', confidence: 50 };
-  }
+  let overallSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+  let confidence = 50;
   
-  const bullishPercentage = (bullishScore / totalScore) * 100;
-  avgConfidence = avgConfidence / totalWeight;
-  
-  let sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-  if (bullishPercentage > 60) {
-    sentiment = 'BULLISH';
-  } else if (bullishPercentage < 40) {
-    sentiment = 'BEARISH';
-  } else {
-    sentiment = 'NEUTRAL';
-  }
-  
-  return { sentiment, confidence: avgConfidence };
-};
-
-const analyzeContrarian = (retailSentiment: string, institutionalSentiment: string): boolean => {
-  // Contrarian signal: when retail and institutional sentiment oppose each other
-  return (retailSentiment === 'BULLISH' && institutionalSentiment === 'BEARISH') ||
-         (retailSentiment === 'BEARISH' && institutionalSentiment === 'BULLISH');
-};
-
-export const analyzeAdvancedSentiment = async (apiKey: string): Promise<AdvancedSentimentAnalysis> => {
-  const sentimentData = generateMockSentimentData();
-  const cotData = generateMockCOTData();
-  
-  // Calculate weighted sentiment
-  const { sentiment: overallSentiment, confidence } = calculateWeightedSentiment(sentimentData);
-  
-  // Determine institutional vs retail sentiment
-  const institutionalSources = sentimentData.filter(s => s.source.includes('Analyst') || s.source.includes('News'));
-  const retailSources = sentimentData.filter(s => s.source.includes('Twitter') || s.source.includes('Reddit'));
-  
-  const { sentiment: institutionalPositioning } = calculateWeightedSentiment(institutionalSources);
-  const { sentiment: retailSentiment } = calculateWeightedSentiment(retailSources);
-  
-  // Check for contrarian signal
-  const contrarian = analyzeContrarian(retailSentiment, institutionalPositioning);
-  
-  // Enhance with AI sentiment analysis
-  let enhancedConfidence = confidence;
-  try {
-    if (apiKey && apiKey.length > 10) {
-      const sentimentSummary = sentimentData.map(s => `${s.source}: ${s.sentiment}`).join(', ');
-      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Analyze EURUSD market sentiment: ${sentimentSummary}. COT: ${cotData.sentiment}. Overall: ${overallSentiment}. Provide confidence adjustment.`
-            }]
-          }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 100 }
-        })
-      });
-      
-      if (response.ok) {
-        enhancedConfidence = Math.min(95, confidence + 5);
-      }
+  if (totalScore > 0) {
+    const bullishPercentage = (bullishScore / totalScore) * 100;
+    confidence = Math.round((totalWeight / sources.length) * 100);
+    
+    if (bullishPercentage > 65) {
+      overallSentiment = 'BULLISH';
+    } else if (bullishPercentage < 35) {
+      overallSentiment = 'BEARISH';
     }
-  } catch (error) {
-    console.log('AI sentiment enhancement failed');
   }
   
   return {
     overallSentiment,
-    confidence: enhancedConfidence,
-    sources: sentimentData,
-    cotData,
-    institutionalPositioning,
-    retailSentiment,
-    contrarian,
-    recommendation: generateSentimentRecommendation(overallSentiment, enhancedConfidence, contrarian, cotData.sentiment)
+    confidence,
+    sources,
+    priceAnalysis,
+    recommendation: generateRecommendation(overallSentiment, confidence, priceAnalysis)
   };
 };
 
-const generateSentimentRecommendation = (
-  sentiment: string, 
-  confidence: number, 
-  contrarian: boolean, 
-  cotSentiment: string
-): string => {
-  let recommendation = `Overall sentiment: ${sentiment} (${confidence.toFixed(0)}% confidence)`;
+const generateRecommendation = (sentiment: string, confidence: number, priceAnalysis: any): string => {
+  const volatilityText = priceAnalysis.volatility > 0.03 ? 'cao' : priceAnalysis.volatility > 0.015 ? 'trung bình' : 'thấp';
   
-  if (contrarian) {
-    recommendation += '. Contrarian signal detected - consider opposite positioning.';
+  if (sentiment === 'BULLISH' && confidence > 70) {
+    return `Tín hiệu TĂNG mạnh với độ tin cậy ${confidence}%. Volatility ${volatilityText}. Khuyến nghị MUA.`;
+  } else if (sentiment === 'BEARISH' && confidence > 70) {
+    return `Tín hiệu GIẢM mạnh với độ tin cậy ${confidence}%. Volatility ${volatilityText}. Khuyến nghị BÁN.`;
+  } else if (confidence > 60) {
+    return `Tín hiệu ${sentiment} với độ tin cậy ${confidence}%. Volatility ${volatilityText}. Quan sát thêm.`;
+  } else {
+    return `Tín hiệu không rõ ràng (${confidence}% tin cậy). Chờ đợi tín hiệu mạnh hơn.`;
   }
-  
-  if (cotSentiment !== sentiment) {
-    recommendation += ` COT data shows ${cotSentiment} bias, conflicting with general sentiment.`;
-  }
-  
-  if (confidence > 75) {
-    recommendation += ` High confidence ${sentiment.toLowerCase()} sentiment supports trend following.`;
-  } else if (confidence < 50) {
-    recommendation += ' Low confidence suggests waiting for clearer sentiment signals.';
-  }
-  
-  return recommendation;
 };
