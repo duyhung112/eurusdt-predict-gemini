@@ -1,147 +1,254 @@
 
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Activity, Circle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { TrendingUp, TrendingDown, Activity, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import { fetchBinanceKlines, fetch24hrStats } from "@/utils/binanceAPI";
+import { analyzeCryptoTechnicals } from "@/utils/cryptoTechnicalAnalysis";
+import { validateGeminiApiKey } from "@/utils/apiKeyValidator";
 
-interface TradingSignal {
-  id: string;
-  type: 'BUY' | 'SELL' | 'HOLD';
-  strength: 'WEAK' | 'MODERATE' | 'STRONG';
+interface LiveSignal {
+  type: 'BUY' | 'SELL' | 'NEUTRAL';
+  strength: 'STRONG' | 'MODERATE' | 'WEAK';
+  confidence: number;
+  timeframe: string;
+  reason: string;
   price: number;
   timestamp: Date;
-  indicator: string;
-  description: string;
 }
 
 export const TradingSignals = () => {
-  const [signals, setSignals] = useState<TradingSignal[]>([]);
-  const [activeSignals, setActiveSignals] = useState(0);
+  const [signals, setSignals] = useState<LiveSignal[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
+  const [apiKeyStatus, setApiKeyStatus] = useState<'unchecked' | 'valid' | 'invalid'>('unchecked');
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
 
   useEffect(() => {
-    const generateSignals = () => {
-      const newSignals: TradingSignal[] = [
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) {
+      setGeminiApiKey(savedKey);
+    }
+    loadLiveSignals();
+  }, []);
+
+  const validateApiKey = async () => {
+    if (!geminiApiKey.trim()) {
+      toast.error("Vui lòng nhập API key");
+      return;
+    }
+
+    setIsValidatingKey(true);
+    try {
+      const validation = await validateGeminiApiKey(geminiApiKey);
+      
+      if (validation.isValid) {
+        setApiKeyStatus('valid');
+        localStorage.setItem('gemini_api_key', geminiApiKey);
+        toast.success("✅ " + validation.message);
+      } else {
+        setApiKeyStatus('invalid');
+        toast.error("❌ " + validation.message);
+      }
+    } catch (error) {
+      setApiKeyStatus('invalid');
+      toast.error("Lỗi kiểm tra API key");
+    } finally {
+      setIsValidatingKey(false);
+    }
+  };
+
+  const loadLiveSignals = async () => {
+    setIsLoading(true);
+    try {
+      console.log('Loading live signals from Binance data...');
+      
+      // Fetch real market data
+      const [priceData, marketStats] = await Promise.all([
+        fetchBinanceKlines('ARBUSDT', '15m', 50),
+        fetch24hrStats('ARBUSDT')
+      ]);
+
+      console.log('Real market data loaded:', priceData.length, 'candles');
+
+      // Analyze with real data
+      const technicalAnalysis = analyzeCryptoTechnicals(priceData);
+      
+      // Generate live signals from real data
+      const liveSignals: LiveSignal[] = [
         {
-          id: '1',
-          type: 'BUY',
-          strength: 'STRONG',
-          price: 1.0850,
-          timestamp: new Date(Date.now() - 5 * 60000),
-          indicator: 'RSI Oversold',
-          description: 'RSI dropped below 30, potential reversal'
-        },
-        {
-          id: '2',
-          type: 'SELL',
-          strength: 'MODERATE',
-          price: 1.0875,
-          timestamp: new Date(Date.now() - 15 * 60000),
-          indicator: 'MACD Bearish',
-          description: 'MACD line crossed below signal line'
-        },
-        {
-          id: '3',
-          type: 'HOLD',
-          strength: 'WEAK',
-          price: 1.0860,
-          timestamp: new Date(Date.now() - 25 * 60000),
-          indicator: 'Bollinger Squeeze',
-          description: 'Low volatility, waiting for breakout'
+          type: technicalAnalysis.overallSignal.includes('BUY') ? 'BUY' : 
+                technicalAnalysis.overallSignal.includes('SELL') ? 'SELL' : 'NEUTRAL',
+          strength: technicalAnalysis.overallSignal.includes('STRONG') ? 'STRONG' : 
+                   technicalAnalysis.confidence > 70 ? 'MODERATE' : 'WEAK',
+          confidence: Math.round(technicalAnalysis.confidence),
+          timeframe: '15m',
+          reason: `Phân tích kỹ thuật từ ${priceData.length} nến thực`,
+          price: marketStats.price,
+          timestamp: new Date()
         }
       ];
+
+      // Add volume signal if significant
+      const volumeIndicator = technicalAnalysis.indicators.find(i => i.name === 'Volume');
+      if (volumeIndicator && volumeIndicator.signal !== 'NEUTRAL') {
+        liveSignals.push({
+          type: volumeIndicator.signal === 'BUY' ? 'BUY' : 'SELL',
+          strength: 'MODERATE',
+          confidence: 75,
+          timeframe: '1h',
+          reason: `Volume ${volumeIndicator.signal === 'BUY' ? 'tăng' : 'giảm'} bất thường`,
+          price: marketStats.price,
+          timestamp: new Date()
+        });
+      }
+
+      // Add momentum signal
+      const rsi = technicalAnalysis.indicators.find(i => i.name === 'RSI');
+      if (rsi && rsi.signal !== 'NEUTRAL') {
+        liveSignals.push({
+          type: rsi.signal === 'BUY' ? 'BUY' : 'SELL',
+          strength: 'WEAK',
+          confidence: 60,
+          timeframe: '4h',
+          reason: `RSI ${rsi.value.toFixed(1)} - ${rsi.signal === 'BUY' ? 'Oversold' : 'Overbought'}`,
+          price: marketStats.price,
+          timestamp: new Date()
+        });
+      }
+
+      setSignals(liveSignals);
+      setLastUpdate(new Date());
+      console.log('Live signals generated from real data:', liveSignals.length);
       
-      setSignals(newSignals);
-      setActiveSignals(newSignals.filter(s => s.type !== 'HOLD').length);
-    };
+    } catch (error) {
+      console.error('Error loading live signals:', error);
+      toast.error("Không thể tải tín hiệu thực");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    generateSignals();
-    const interval = setInterval(generateSignals, 45000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const getSignalColor = (type: string, strength: string) => {
+    if (type === 'BUY') {
+      return strength === 'STRONG' ? 'bg-green-600' : 'bg-green-500';
+    }
+    if (type === 'SELL') {
+      return strength === 'STRONG' ? 'bg-red-600' : 'bg-red-500';
+    }
+    return 'bg-gray-500';
+  };
 
   const getSignalIcon = (type: string) => {
     switch (type) {
-      case 'BUY': return <TrendingUp className="h-4 w-4" />;
-      case 'SELL': return <TrendingDown className="h-4 w-4" />;
-      default: return <Activity className="h-4 w-4" />;
-    }
-  };
-
-  const getSignalColor = (type: string) => {
-    switch (type) {
-      case 'BUY': return 'text-green-400 bg-green-400/10 border-green-400/20';
-      case 'SELL': return 'text-red-400 bg-red-400/10 border-red-400/20';
-      default: return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
-    }
-  };
-
-  const getStrengthColor = (strength: string) => {
-    switch (strength) {
-      case 'STRONG': return 'text-green-400';
-      case 'MODERATE': return 'text-yellow-400';
-      default: return 'text-slate-400';
+      case 'BUY': return <TrendingUp className="h-3 w-3" />;
+      case 'SELL': return <TrendingDown className="h-3 w-3" />;
+      default: return <Activity className="h-3 w-3" />;
     }
   };
 
   return (
-    <Card className="bg-slate-800/50 border-slate-700 p-6">
-      <div className="space-y-4">
-        {/* Header */}
+    <Card className="bg-slate-800/50 border-slate-700">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Live Signals</h3>
+          <CardTitle className="text-lg text-white flex items-center space-x-2">
+            <Activity className="h-5 w-5 text-green-400" />
+            <span>Live Signals (Real Data)</span>
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadLiveSignals}
+            disabled={isLoading}
+            className="border-slate-600 hover:bg-slate-700"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        {/* API Key Validation */}
+        <div className="space-y-2 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
           <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1">
-              <Circle className="h-2 w-2 text-green-400 fill-current animate-pulse" />
-              <span className="text-xs text-slate-400">Live</span>
-            </div>
-            <Badge variant="outline" className="text-xs">
-              {activeSignals} Active
-            </Badge>
+            <Input
+              type="password"
+              placeholder="Nhập Gemini API Key để AI phân tích"
+              value={geminiApiKey}
+              onChange={(e) => setGeminiApiKey(e.target.value)}
+              className="bg-slate-700 border-slate-600 text-white text-sm"
+            />
+            <Button 
+              onClick={validateApiKey}
+              disabled={isValidatingKey || !geminiApiKey.trim()}
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {isValidatingKey ? 'Kiểm tra...' : 'Validate'}
+            </Button>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {apiKeyStatus === 'valid' && (
+              <div className="flex items-center text-green-400 text-xs">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                API key hợp lệ
+              </div>
+            )}
+            {apiKeyStatus === 'invalid' && (
+              <div className="flex items-center text-red-400 text-xs">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                API key không hợp lệ
+              </div>
+            )}
+            {apiKeyStatus === 'unchecked' && (
+              <div className="text-slate-400 text-xs">
+                🔒 Chưa kiểm tra API key
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Signals List */}
-        <div className="space-y-3">
-          {signals.map((signal) => (
-            <div key={signal.id} className="bg-slate-900/50 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <div className={`p-2 rounded-lg ${getSignalColor(signal.type)}`}>
+        {/* Live Signals */}
+        <div className="space-y-2">
+          {signals.length > 0 ? (
+            signals.map((signal, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-slate-900/30 rounded-lg border border-slate-700">
+                <div className="flex items-center space-x-3">
+                  <Badge className={`${getSignalColor(signal.type, signal.strength)} text-white text-xs`}>
                     {getSignalIcon(signal.type)}
-                  </div>
+                    <span className="ml-1">{signal.strength} {signal.type}</span>
+                  </Badge>
                   <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium text-white">{signal.type}</span>
-                      <span className={`text-xs ${getStrengthColor(signal.strength)}`}>
-                        {signal.strength}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-400">{signal.indicator}</div>
+                    <div className="text-sm font-medium text-white">{signal.timeframe}</div>
+                    <div className="text-xs text-slate-400">{signal.reason}</div>
                   </div>
                 </div>
-                <div className="text-right text-xs text-slate-400">
-                  {signal.timestamp.toLocaleTimeString()}
+                <div className="text-right">
+                  <div className="text-sm font-semibold text-white">{signal.confidence}%</div>
+                  <div className="text-xs text-slate-400">${signal.price.toFixed(4)}</div>
                 </div>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-300">{signal.description}</span>
-                <span className="text-sm font-mono text-white">{signal.price.toFixed(4)}</span>
-              </div>
+            ))
+          ) : (
+            <div className="text-center text-slate-400 py-4">
+              {isLoading ? 'Đang tải tín hiệu thực...' : 'Không có tín hiệu'}
             </div>
-          ))}
+          )}
         </div>
 
-        {/* Signal Summary */}
-        <div className="mt-4 p-3 bg-gradient-to-r from-slate-900/50 to-blue-900/20 rounded-lg border border-blue-500/20">
-          <div className="text-xs text-blue-300 mb-1">Signal Summary</div>
-          <div className="text-xs text-slate-300">
-            Market showing mixed signals with moderate volatility. 
-            RSI approaching oversold territory while MACD remains bearish.
+        {/* Data Source Info */}
+        <div className="text-xs text-slate-500 bg-slate-900/30 p-2 rounded">
+          <div className="flex items-center justify-between">
+            <span>📡 Dữ liệu: Live Binance API</span>
+            <span>🕒 {lastUpdate.toLocaleTimeString('vi-VN')}</span>
           </div>
         </div>
-      </div>
+      </CardContent>
     </Card>
   );
 };
