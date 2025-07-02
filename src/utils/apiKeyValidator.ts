@@ -1,5 +1,4 @@
 
-
 interface ApiKeyValidationResult {
   isValid: boolean;
   error?: string;
@@ -15,27 +14,29 @@ export const validateGeminiApiKey = async (apiKey: string): Promise<ApiKeyValida
     };
   }
 
-  if (apiKey.length < 30) {
+  // Check basic format for Google API keys
+  if (!isValidApiKeyFormat(apiKey)) {
     return {
       isValid: false,
       error: 'INVALID_FORMAT',
-      message: 'API key có định dạng không hợp lệ (quá ngắn)'
+      message: 'API key có định dạng không hợp lệ (phải bắt đầu với AIza và có 39 ký tự)'
     };
   }
 
   try {
-    const testResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+    // Test with a simple request to Gemini API
+    const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: 'Test connection' }]
+          parts: [{ text: 'Hello' }]
         }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 10
+          maxOutputTokens: 5
         }
       })
     });
@@ -57,46 +58,88 @@ export const validateGeminiApiKey = async (apiKey: string): Promise<ApiKeyValida
     }
 
     if (testResponse.status === 400) {
-      const errorData = await testResponse.json();
-      if (errorData.error?.code === 'API_KEY_INVALID') {
-        return {
-          isValid: false,
-          error: 'INVALID_KEY',
-          message: 'API key không tồn tại hoặc không hợp lệ'
-        };
+      try {
+        const errorData = await testResponse.json();
+        console.log('API Error Details:', errorData);
+        
+        if (errorData.error?.message?.includes('API_KEY_INVALID') || 
+            errorData.error?.message?.includes('Invalid API key')) {
+          return {
+            isValid: false,
+            error: 'INVALID_KEY',
+            message: 'API key không tồn tại hoặc không hợp lệ'
+          };
+        }
+      } catch (e) {
+        console.log('Could not parse error response');
       }
     }
 
-    if (!testResponse.ok) {
+    if (testResponse.status === 404) {
       return {
         isValid: false,
-        error: 'API_ERROR',
-        message: `Lỗi API: ${testResponse.status} - ${testResponse.statusText}`
+        error: 'NOT_FOUND',
+        message: 'API endpoint không tìm thấy. Kiểm tra lại API key và dịch vụ.'
       };
     }
 
-    // If we get here, the API key is valid
+    // Check if response is successful (200-299)
+    if (testResponse.ok) {
+      try {
+        const responseData = await testResponse.json();
+        if (responseData.candidates && responseData.candidates.length > 0) {
+          return {
+            isValid: true,
+            message: 'API key hợp lệ và hoạt động tốt!'
+          };
+        }
+      } catch (e) {
+        console.log('Response parsing error, but API key seems valid');
+      }
+      
+      return {
+        isValid: true,
+        message: 'API key hợp lệ và hoạt động tốt!'
+      };
+    }
+
     return {
-      isValid: true,
-      message: 'API key hợp lệ và hoạt động tốt'
+      isValid: false,
+      error: 'API_ERROR',
+      message: `Lỗi API: ${testResponse.status} - ${testResponse.statusText}`
     };
 
   } catch (error) {
     console.error('API key validation error:', error);
+    
+    // Check if it's a network error
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return {
+        isValid: false,
+        error: 'NETWORK_ERROR',
+        message: 'Không thể kết nối để kiểm tra API key. Kiểm tra kết nối mạng.'
+      };
+    }
+    
     return {
       isValid: false,
-      error: 'NETWORK_ERROR',
-      message: 'Không thể kết nối để kiểm tra API key. Kiểm tra kết nối mạng.'
+      error: 'UNKNOWN_ERROR',
+      message: 'Lỗi không xác định khi kiểm tra API key'
     };
   }
 };
 
 export const isValidApiKeyFormat = (apiKey: string): boolean => {
   if (!apiKey || apiKey.trim().length === 0) return false;
-  if (apiKey.length < 30) return false;
   
-  // Basic format check for Google API keys
-  const googleApiKeyPattern = /^AIza[0-9A-Za-z-_]{35}$/;
-  return googleApiKeyPattern.test(apiKey.trim());
+  // Google API keys start with "AIza" and are exactly 39 characters long
+  const trimmedKey = apiKey.trim();
+  
+  // Check length and prefix
+  if (trimmedKey.length !== 39) return false;
+  if (!trimmedKey.startsWith('AIza')) return false;
+  
+  // Check if contains only valid characters (alphanumeric, dash, underscore)
+  const validChars = /^[A-Za-z0-9\-_]+$/;
+  return validChars.test(trimmedKey);
 };
-
