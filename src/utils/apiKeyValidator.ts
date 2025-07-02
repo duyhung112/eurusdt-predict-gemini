@@ -1,4 +1,5 @@
 
+
 interface ApiKeyValidationResult {
   isValid: boolean;
   error?: string;
@@ -39,7 +40,7 @@ export const validateGeminiApiKey = async (apiKey: string): Promise<ApiKeyValida
       })
     });
 
-    if (response.status === 403) {
+    if (testResponse.status === 403) {
       return {
         isValid: false,
         error: 'FORBIDDEN',
@@ -47,7 +48,7 @@ export const validateGeminiApiKey = async (apiKey: string): Promise<ApiKeyValida
       };
     }
 
-    if (response.status === 401) {
+    if (testResponse.status === 401) {
       return {
         isValid: false,
         error: 'UNAUTHORIZED',
@@ -55,8 +56,8 @@ export const validateGeminiApiKey = async (apiKey: string): Promise<ApiKeyValida
       };
     }
 
-    if (response.status === 400) {
-      const errorData = await response.json();
+    if (testResponse.status === 400) {
+      const errorData = await testResponse.json();
       if (errorData.error?.code === 'API_KEY_INVALID') {
         return {
           isValid: false,
@@ -66,11 +67,11 @@ export const validateGeminiApiKey = async (apiKey: string): Promise<ApiKeyValida
       }
     }
 
-    if (!response.ok) {
+    if (!testResponse.ok) {
       return {
         isValid: false,
         error: 'API_ERROR',
-        message: `Lỗi API: ${response.status} - ${response.statusText}`
+        message: `Lỗi API: ${testResponse.status} - ${testResponse.statusText}`
       };
     }
 
@@ -98,3 +99,4 @@ export const isValidApiKeyFormat = (apiKey: string): boolean => {
   const googleApiKeyPattern = /^AIza[0-9A-Za-z-_]{35}$/;
   return googleApiKeyPattern.test(apiKey.trim());
 };
+
