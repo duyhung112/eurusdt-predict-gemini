@@ -5,6 +5,7 @@ import { CryptoAnalysisComponent } from "@/components/CryptoAnalysisComponent";
 import { AIAnalysis } from "@/components/AIAnalysis";
 import { AIPredictions } from "@/components/AIPredictions";
 import { TradingSignals } from "@/components/TradingSignals";
+import { AutoTradingMonitor } from "@/components/AutoTradingMonitor";
 import { NewsAnalysis } from "@/components/NewsAnalysis";
 import { ComprehensiveAnalysisComponent } from "@/components/ComprehensiveAnalysis";
 import { MasterAnalysisComponent } from "@/components/MasterAnalysisComponent";
@@ -21,6 +22,7 @@ const Index = () => {
     high24h: 0.8456,
     low24h: 0.8123
   });
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
 
   useEffect(() => {
     const fetchMarketData = async () => {
@@ -37,6 +39,12 @@ const Index = () => {
         console.error('Error fetching market data:', error);
       }
     };
+
+    // Load saved API key
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) {
+      setGeminiApiKey(savedKey);
+    }
 
     fetchMarketData();
     
@@ -99,6 +107,13 @@ const Index = () => {
           {/* Right Sidebar */}
           <div className="space-y-6">
             <TradingSignals />
+            
+            {geminiApiKey && (
+              <AutoTradingMonitor 
+                apiKey={geminiApiKey} 
+                isEnabled={false} 
+              />
+            )}
             
             <Tabs defaultValue="crypto" className="w-full">
               <TabsList className="grid w-full grid-cols-5 bg-slate-800 border-slate-700">
