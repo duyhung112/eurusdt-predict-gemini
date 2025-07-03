@@ -12,6 +12,8 @@ import { generateRealTimeAISignal, generateTradeRecommendation, AITradingSignal,
 interface AutoTradingMonitorProps {
   apiKey: string;
   isEnabled?: boolean;
+  symbol?: string;
+  timeframe?: string;
 }
 
 interface SignalHistory {
@@ -20,7 +22,7 @@ interface SignalHistory {
   timestamp: Date;
 }
 
-export const AutoTradingMonitor = ({ apiKey, isEnabled = false }: AutoTradingMonitorProps) => {
+export const AutoTradingMonitor = ({ apiKey, isEnabled = false, symbol = 'ARBUSDT', timeframe = '15m' }: AutoTradingMonitorProps) => {
   const [isActive, setIsActive] = useState(isEnabled);
   const [currentSignal, setCurrentSignal] = useState<AITradingSignal | null>(null);
   const [currentRecommendation, setCurrentRecommendation] = useState<TradeRecommendation | null>(null);
@@ -105,7 +107,7 @@ export const AutoTradingMonitor = ({ apiKey, isEnabled = false }: AutoTradingMon
       console.log(`🤖 Running auto analysis #${analysisCount + 1}...`);
       
       // Fetch fresh market data
-      const priceData = await fetchBinanceKlines('ARBUSDT', '15m', 100);
+      const priceData = await fetchBinanceKlines(symbol, timeframe, 100);
       console.log('Fetched market data:', priceData.length, 'candles');
       
       // Generate AI signal

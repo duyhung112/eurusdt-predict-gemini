@@ -21,7 +21,12 @@ interface LiveSignal {
   timestamp: Date;
 }
 
-export const TradingSignals = () => {
+interface TradingSignalsProps {
+  symbol?: string;
+  timeframe?: string;
+}
+
+export const TradingSignals = ({ symbol = 'ARBUSDT', timeframe = '15m' }: TradingSignalsProps) => {
   const [signals, setSignals] = useState<LiveSignal[]>([]);
   const [aiSignal, setAiSignal] = useState<AITradingSignal | null>(null);
   const [tradeRecommendation, setTradeRecommendation] = useState<TradeRecommendation | null>(null);
@@ -38,7 +43,7 @@ export const TradingSignals = () => {
       setGeminiApiKey(savedKey);
     }
     loadLiveSignals();
-  }, []);
+  }, [symbol, timeframe]);
 
   const validateApiKey = async () => {
     if (!geminiApiKey.trim()) {
@@ -82,7 +87,7 @@ export const TradingSignals = () => {
       console.log('🤖 Starting real-time AI analysis...');
       
       // Fetch fresh data for AI analysis
-      const priceData = await fetchBinanceKlines('ARBUSDT', '15m', 100);
+      const priceData = await fetchBinanceKlines(symbol, timeframe, 100);
       console.log('Fetched data for AI analysis:', priceData.length, 'candles');
       
       // Generate AI signal
@@ -111,8 +116,8 @@ export const TradingSignals = () => {
       
       // Fetch real market data
       const [priceData, marketStats] = await Promise.all([
-        fetchBinanceKlines('ARBUSDT', '15m', 50),
-        fetch24hrStats('ARBUSDT')
+        fetchBinanceKlines(symbol, timeframe, 50),
+        fetch24hrStats(symbol)
       ]);
 
       console.log('Real market data loaded:', priceData.length, 'candles');
@@ -128,7 +133,7 @@ export const TradingSignals = () => {
           strength: technicalAnalysis.overallSignal.includes('STRONG') ? 'STRONG' : 
                    technicalAnalysis.confidence > 70 ? 'MODERATE' : 'WEAK',
           confidence: Math.round(technicalAnalysis.confidence),
-          timeframe: '15m',
+          timeframe: timeframe,
           reason: `Phân tích kỹ thuật từ ${priceData.length} nến thực`,
           price: marketStats.price,
           timestamp: new Date()

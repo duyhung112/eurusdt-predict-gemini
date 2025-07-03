@@ -9,12 +9,15 @@ import { AutoTradingMonitor } from "@/components/AutoTradingMonitor";
 import { NewsAnalysis } from "@/components/NewsAnalysis";
 import { ComprehensiveAnalysisComponent } from "@/components/ComprehensiveAnalysis";
 import { MasterAnalysisComponent } from "@/components/MasterAnalysisComponent";
+import { CoinTimeframeSelector, SUPPORTED_COINS, TIMEFRAMES } from "@/components/CoinTimeframeSelector";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Brain, Target, BarChart3, Newspaper, Zap, Crown, Bitcoin } from "lucide-react";
 import { fetch24hrStats } from "@/utils/binanceAPI";
 
 const Index = () => {
+  const [selectedSymbol, setSelectedSymbol] = useState('ARBUSDT');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('15m');
   const [marketData, setMarketData] = useState({
     price: 0.8234,
     change24h: 0.0156,
@@ -27,7 +30,7 @@ const Index = () => {
   useEffect(() => {
     const fetchMarketData = async () => {
       try {
-        const stats = await fetch24hrStats('ARBUSDT');
+        const stats = await fetch24hrStats(selectedSymbol);
         setMarketData({
           price: stats.price,
           change24h: stats.change24h,
@@ -51,7 +54,7 @@ const Index = () => {
     // Update every 30 seconds
     const interval = setInterval(fetchMarketData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedSymbol]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-800">
@@ -65,7 +68,7 @@ const Index = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">AI Crypto Hub</h1>
-                <p className="text-sm text-purple-300">ARB/USDT Analysis System</p>
+                <p className="text-sm text-purple-300">{selectedSymbol} Analysis System</p>
               </div>
             </div>
             <div className="flex items-center space-x-6">
@@ -92,7 +95,7 @@ const Index = () => {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-3">
                   <BarChart3 className="h-6 w-6 text-purple-400" />
-                  <h2 className="text-xl font-semibold text-white">ARB/USDT Live Chart</h2>
+                  <h2 className="text-xl font-semibold text-white">{selectedSymbol} Live Chart</h2>
                 </div>
                 <div className="flex space-x-2 text-sm text-slate-400">
                   <span>H: ${marketData.high24h.toFixed(4)}</span>
@@ -100,18 +103,33 @@ const Index = () => {
                   <span>Vol: {(marketData.volume / 1000000).toFixed(1)}M</span>
                 </div>
               </div>
-              <CryptoTradingViewWidget />
+              <CryptoTradingViewWidget 
+                symbol={`BINANCE:${selectedSymbol}`}
+                interval={TIMEFRAMES.find(tf => tf.value === selectedTimeframe)?.interval || '15'}
+              />
             </Card>
           </div>
 
           {/* Right Sidebar */}
           <div className="space-y-6">
-            <TradingSignals />
+            <CoinTimeframeSelector
+              selectedSymbol={selectedSymbol}
+              selectedTimeframe={selectedTimeframe}
+              onSymbolChange={setSelectedSymbol}
+              onTimeframeChange={setSelectedTimeframe}
+            />
+            
+            <TradingSignals 
+              symbol={selectedSymbol}
+              timeframe={selectedTimeframe}
+            />
             
             {geminiApiKey && (
               <AutoTradingMonitor 
                 apiKey={geminiApiKey} 
-                isEnabled={false} 
+                isEnabled={false}
+                symbol={selectedSymbol}
+                timeframe={selectedTimeframe}
               />
             )}
             
