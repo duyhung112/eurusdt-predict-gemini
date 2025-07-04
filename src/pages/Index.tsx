@@ -51,8 +51,8 @@ const Index = () => {
 
     fetchMarketData();
     
-    // Update every 30 seconds
-    const interval = setInterval(fetchMarketData, 30000);
+    // Update every 10 seconds for more real-time feel
+    const interval = setInterval(fetchMarketData, 10000);
     return () => clearInterval(interval);
   }, [selectedSymbol]);
 

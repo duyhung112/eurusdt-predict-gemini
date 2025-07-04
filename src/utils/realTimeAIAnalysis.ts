@@ -318,7 +318,8 @@ const getGeminiAnalysis = async (
     const currentPrice = priceData[priceData.length - 1].close;
     const priceChange = ((currentPrice - priceData[priceData.length - 2].close) / priceData[priceData.length - 2].close) * 100;
     
-    const prompt = `Phân tích crypto ARB/USDT với dữ liệu thực:
+    const symbol = priceData.length > 0 ? 'CRYPTO' : 'ARB/USDT';
+    const prompt = `Phân tích crypto với dữ liệu thực:
     - Giá hiện tại: $${currentPrice.toFixed(4)} (${priceChange > 0 ? '+' : ''}${priceChange.toFixed(2)}%)
     - RSI: ${indicators.rsi.value.toFixed(2)} (${indicators.rsi.signal})
     - MACD: ${indicators.macd.value.toFixed(6)} (${indicators.macd.signal})

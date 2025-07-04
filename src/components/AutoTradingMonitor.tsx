@@ -106,8 +106,12 @@ export const AutoTradingMonitor = ({ apiKey, isEnabled = false, symbol = 'ARBUSD
     try {
       console.log(`🤖 Running auto analysis #${analysisCount + 1}...`);
       
-      // Fetch fresh market data
-      const priceData = await fetchBinanceKlines(symbol, timeframe, 100);
+      // Fetch fresh market data with proper timeframe mapping
+      const intervalMap = {
+        '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+        '1h': '1h', '4h': '4h', '1d': '1d'
+      };
+      const priceData = await fetchBinanceKlines(symbol, intervalMap[timeframe] || '15m', 100);
       console.log('Fetched market data:', priceData.length, 'candles');
       
       // Generate AI signal

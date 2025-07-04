@@ -86,8 +86,12 @@ export const TradingSignals = ({ symbol = 'ARBUSDT', timeframe = '15m' }: Tradin
     try {
       console.log('🤖 Starting real-time AI analysis...');
       
-      // Fetch fresh data for AI analysis
-      const priceData = await fetchBinanceKlines(symbol, timeframe, 100);
+      // Fetch fresh data for AI analysis with proper timeframe mapping
+      const intervalMap = {
+        '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+        '1h': '1h', '4h': '4h', '1d': '1d'
+      };
+      const priceData = await fetchBinanceKlines(symbol, intervalMap[timeframe] || '15m', 100);
       console.log('Fetched data for AI analysis:', priceData.length, 'candles');
       
       // Generate AI signal
@@ -114,9 +118,13 @@ export const TradingSignals = ({ symbol = 'ARBUSDT', timeframe = '15m' }: Tradin
     try {
       console.log('Loading live signals from Binance data...');
       
-      // Fetch real market data
+      // Fetch real market data with proper timeframe mapping
+      const intervalMap = {
+        '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+        '1h': '1h', '4h': '4h', '1d': '1d'
+      };
       const [priceData, marketStats] = await Promise.all([
-        fetchBinanceKlines(symbol, timeframe, 50),
+        fetchBinanceKlines(symbol, intervalMap[timeframe] || '15m', 50),
         fetch24hrStats(symbol)
       ]);
 
