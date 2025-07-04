@@ -10,7 +10,12 @@ import { toast } from "sonner";
 import { generateCryptoComprehensiveAnalysis, ComprehensiveAnalysis } from "@/utils/comprehensiveAnalysis";
 import { fetchBinanceKlines } from "@/utils/binanceAPI";
 
-export const ComprehensiveAnalysisComponent = () => {
+interface ComprehensiveAnalysisProps {
+  selectedSymbol?: string;
+  selectedTimeframe?: string;
+}
+
+export const ComprehensiveAnalysisComponent = ({ selectedSymbol = 'ARBUSDT', selectedTimeframe = '15m' }: ComprehensiveAnalysisProps) => {
   const [analysis, setAnalysis] = useState<ComprehensiveAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,10 +27,14 @@ export const ComprehensiveAnalysisComponent = () => {
     setIsLoading(true);
     try {
       const apiKey = localStorage.getItem('gemini_api_key') || '';
-      const priceData = await fetchBinanceKlines('ARBUSDT', '1h', 100);
+      const intervalMap = {
+        '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+        '1h': '1h', '4h': '4h', '1d': '1d'
+      };
+      const priceData = await fetchBinanceKlines(selectedSymbol, intervalMap[selectedTimeframe] || '1h', 100);
       const result = await generateCryptoComprehensiveAnalysis(priceData, apiKey);
       setAnalysis(result);
-      toast.success("Phân tích tổng hợp đã được cập nhật!");
+      toast.success(`Phân tích tổng hợp ${selectedSymbol} (${selectedTimeframe}) hoàn tất!`);
     } catch (error) {
       console.error('Error loading comprehensive analysis:', error);
       toast.error("Không thể tải phân tích tổng hợp");
@@ -87,7 +96,7 @@ export const ComprehensiveAnalysisComponent = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Brain className="h-5 w-5 text-purple-400" />
-            <h3 className="text-lg font-semibold text-white">Phân Tích AI Tổng Hợp</h3>
+            <h3 className="text-lg font-semibold text-white">Phân Tích {selectedSymbol} ({selectedTimeframe})</h3>
           </div>
           <Button
             variant="outline"

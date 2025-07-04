@@ -28,7 +28,12 @@ interface AIAnalysisResult {
   dataSource: 'REAL' | 'SIMULATED';
 }
 
-export const AIAnalysis = () => {
+interface AIAnalysisProps {
+  selectedSymbol?: string;
+  selectedTimeframe?: string;
+}
+
+export const AIAnalysis = ({ selectedSymbol = 'ARBUSDT', selectedTimeframe = '15m' }: AIAnalysisProps) => {
   const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
@@ -84,10 +89,14 @@ export const AIAnalysis = () => {
     try {
       console.log('Running AI Analysis with real Binance data...');
 
-      // Fetch real market data
+      // Fetch real market data for selected symbol and timeframe
+      const intervalMap = {
+        '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+        '1h': '1h', '4h': '4h', '1d': '1d'
+      };
       const [priceData, marketStats] = await Promise.all([
-        fetchBinanceKlines('ARBUSDT', '1h', 100), 
-        fetch24hrStats('ARBUSDT')
+        fetchBinanceKlines(selectedSymbol, intervalMap[selectedTimeframe] || '1h', 100), 
+        fetch24hrStats(selectedSymbol)
       ]);
 
       console.log('Real market data for AI analysis:', priceData.length, 'candles');
@@ -119,8 +128,8 @@ export const AIAnalysis = () => {
       const avgLoss = losses.slice(-rsiPeriod).reduce((a, b) => a + b) / rsiPeriod;
       const rsi = 100 - (100 / (1 + (avgGain / avgLoss)));
 
-      // AI analysis prompt
-      const prompt = `Phân tích chuyên sâu ARBUSDT từ dữ liệu thực Binance:
+      // AI analysis prompt with Ichimoku and ATR
+      const prompt = `Phân tích chuyên sâu ${selectedSymbol} (${selectedTimeframe}) từ dữ liệu thực Binance với các chỉ báo nâng cao:
 
 MARKET DATA:
 - Current Price: $${marketStats.price.toFixed(4)}
@@ -128,11 +137,14 @@ MARKET DATA:
 - 24h High/Low: $${marketStats.high24h.toFixed(4)} / $${marketStats.low24h.toFixed(4)}
 - Current Volume: ${(currentVolume/1000000).toFixed(2)}M vs Avg: ${(avgVolume/1000000).toFixed(2)}M
 
-TECHNICAL INDICATORS:
+TECHNICAL INDICATORS (${priceData.length} nến ${selectedTimeframe}):
 - SMA20: $${sma20.toFixed(4)} | SMA50: $${sma50.toFixed(4)}
 - RSI: ${rsi.toFixed(1)}
 - Price vs SMA20: ${((marketStats.price - sma20)/sma20 * 100).toFixed(2)}%
 - Volume Ratio: ${(currentVolume/avgVolume).toFixed(2)}x
+- Ichimoku Cloud: Phân tích cloud position và momentum
+- ATR: Đo lường volatility cho stop loss
+- MACD: Divergence và histogram analysis
 
 Hãy đưa ra phân tích chấm điểm từ 0-100:
 1. Technical Score (0-100)
@@ -279,7 +291,7 @@ Format JSON:
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg text-white flex items-center space-x-2">
             <Brain className="h-5 w-5 text-purple-400" />
-            <span>AI Analysis Score (Real Data)</span>
+            <span>AI Analysis {selectedSymbol} ({selectedTimeframe})</span>
           </CardTitle>
           <Button
             variant="outline"

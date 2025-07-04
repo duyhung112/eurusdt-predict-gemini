@@ -111,13 +111,21 @@ const analyzeRealRisk = (priceData: CryptoPriceData[]) => {
   };
 };
 
-export const generateMasterAnalysis = async (apiKey: string): Promise<MasterAnalysis> => {
+export const generateMasterAnalysis = async (
+  apiKey: string, 
+  symbol: string = 'ARBUSDT', 
+  timeframe: string = '15m'
+): Promise<MasterAnalysis> => {
   try {
-    console.log('Starting master analysis with real Binance data...');
+    console.log(`Starting master analysis with real Binance data for ${symbol} (${timeframe})...`);
     
-    // Fetch real market data from Binance
-    const priceData = await fetchBinanceKlines('ARBUSDT', '1h', 100);
-    console.log('Fetched real price data:', priceData.length, 'candles');
+    // Fetch real market data from Binance with selected symbol and timeframe
+    const intervalMap = {
+      '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+      '1h': '1h', '4h': '4h', '1d': '1d'
+    };
+    const priceData = await fetchBinanceKlines(symbol, intervalMap[timeframe] || '1h', 100);
+    console.log(`Fetched real price data for ${symbol} (${timeframe}):`, priceData.length, 'candles');
     
     // Run analyses using real data only
     const [

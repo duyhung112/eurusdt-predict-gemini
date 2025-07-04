@@ -94,8 +94,8 @@ export const TradingSignals = ({ symbol = 'ARBUSDT', timeframe = '15m' }: Tradin
       const priceData = await fetchBinanceKlines(symbol, intervalMap[timeframe] || '15m', 100);
       console.log('Fetched data for AI analysis:', priceData.length, 'candles');
       
-      // Generate AI signal
-      const aiTradingSignal = await generateRealTimeAISignal(priceData, geminiApiKey);
+      // Generate AI signal with symbol and timeframe
+      const aiTradingSignal = await generateRealTimeAISignal(priceData, geminiApiKey, symbol, timeframe);
       setAiSignal(aiTradingSignal);
       
       // Generate trade recommendation

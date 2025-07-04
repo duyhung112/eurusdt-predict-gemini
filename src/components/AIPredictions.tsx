@@ -28,7 +28,12 @@ interface AIPredictions {
   dataSource: 'REAL' | 'SIMULATED';
 }
 
-export const AIPredictions = () => {
+interface AIPredictionsProps {
+  selectedSymbol?: string;
+  selectedTimeframe?: string;
+}
+
+export const AIPredictions = ({ selectedSymbol = 'ARBUSDT', selectedTimeframe = '15m' }: AIPredictionsProps) => {
   const [predictions, setPredictions] = useState<AIPredictions | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
@@ -84,10 +89,14 @@ export const AIPredictions = () => {
     try {
       console.log('Generating AI predictions with real Binance data...');
 
-      // Fetch real market data
+      // Fetch real market data for selected symbol and timeframe
+      const intervalMap = {
+        '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+        '1h': '1h', '4h': '4h', '1d': '1d'
+      };
       const [priceData, marketStats] = await Promise.all([
-        fetchBinanceKlines('ARBUSDT', '1h', 100),
-        fetch24hrStats('ARBUSDT')
+        fetchBinanceKlines(selectedSymbol, intervalMap[selectedTimeframe] || '1h', 100),
+        fetch24hrStats(selectedSymbol)
       ]);
 
       console.log('Real market data for predictions:', priceData.length, 'candles');
@@ -99,8 +108,8 @@ export const AIPredictions = () => {
       const currentVolume = volumes[volumes.length - 1];
       const priceChange24h = ((marketStats.price - priceData[priceData.length - 24].close) / priceData[priceData.length - 24].close) * 100;
 
-      // AI analysis prompt
-      const prompt = `Phân tích dữ liệu ARBUSDT thực từ Binance và đưa ra dự đoán:
+      // AI analysis prompt with advanced indicators
+      const prompt = `Phân tích dữ liệu ${selectedSymbol} (${selectedTimeframe}) thực từ Binance với Ichimoku & ATR:
 
 Dữ liệu thực:
 - Giá hiện tại: $${marketStats.price.toFixed(4)}
@@ -221,7 +230,7 @@ Format JSON:
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg text-white flex items-center space-x-2">
             <Brain className="h-5 w-5 text-purple-400" />
-            <span>AI Predictions (Real Data)</span>
+            <span>AI Predictions {selectedSymbol} ({selectedTimeframe})</span>
           </CardTitle>
           <Button
             variant="outline"

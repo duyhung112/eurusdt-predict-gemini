@@ -43,7 +43,9 @@ export interface TradeRecommendation {
 
 export const generateRealTimeAISignal = async (
   priceData: CryptoPriceData[],
-  apiKey: string
+  apiKey: string,
+  symbol: string = 'ARBUSDT',
+  timeframe: string = '15m'
 ): Promise<AITradingSignal> => {
   console.log('🤖 Generating real-time AI trading signal with live Binance data...');
   
@@ -59,8 +61,8 @@ export const generateRealTimeAISignal = async (
   // Calculate advanced technical indicators from real data
   const indicators = calculateAdvancedIndicators(priceData);
   
-  // Get AI analysis using Gemini
-  const aiAnalysis = await getGeminiAnalysis(priceData, indicators, apiKey);
+  // Get AI analysis using Gemini with symbol and timeframe context
+  const aiAnalysis = await getGeminiAnalysis(priceData, indicators, apiKey, symbol, timeframe);
   
   // Calculate market conditions from real data
   const marketConditions = analyzeMarketConditions(priceData);
@@ -308,7 +310,9 @@ const analyzeMarketConditions = (priceData: CryptoPriceData[]) => {
 const getGeminiAnalysis = async (
   priceData: CryptoPriceData[],
   indicators: any,
-  apiKey: string
+  apiKey: string,
+  symbol: string = 'ARBUSDT',
+  timeframe: string = '15m'
 ): Promise<any> => {
   if (!apiKey || apiKey.length < 10) {
     return { sentiment: 'NEUTRAL', confidence: 50, aiReasoning: 'Không có API key để phân tích AI' };
@@ -318,14 +322,15 @@ const getGeminiAnalysis = async (
     const currentPrice = priceData[priceData.length - 1].close;
     const priceChange = ((currentPrice - priceData[priceData.length - 2].close) / priceData[priceData.length - 2].close) * 100;
     
-    const symbol = priceData.length > 0 ? 'CRYPTO' : 'ARB/USDT';
-    const prompt = `Phân tích crypto với dữ liệu thực:
+    const prompt = `Phân tích ${symbol} (${timeframe}) với dữ liệu thực Binance và Ichimoku Cloud + ATR:
     - Giá hiện tại: $${currentPrice.toFixed(4)} (${priceChange > 0 ? '+' : ''}${priceChange.toFixed(2)}%)
     - RSI: ${indicators.rsi.value.toFixed(2)} (${indicators.rsi.signal})
     - MACD: ${indicators.macd.value.toFixed(6)} (${indicators.macd.signal})
     - Bollinger: ${indicators.bollinger.position}
     - Volume: ${indicators.volume.relative.toFixed(2)}x trung bình
     - Xu hướng: ${indicators.trend.direction} (độ mạnh: ${indicators.trend.strength.toFixed(0)}%)
+    - Ichimoku Cloud: Price vs Cloud position và Tenkan/Kijun cross
+    - ATR: Average True Range cho volatility và stop loss calculation
     
     Đưa ra:
     1. Tín hiệu: BUY/SELL/NEUTRAL

@@ -9,7 +9,12 @@ import { analyzeCryptoTechnicals } from '@/utils/cryptoTechnicalAnalysis';
 import { generateCryptoComprehensiveAnalysis, ComprehensiveAnalysis } from '@/utils/comprehensiveAnalysis';
 import { createBinanceWebSocketClient } from '@/utils/binanceWebSocket';
 
-export const CryptoAnalysisComponent = () => {
+interface CryptoAnalysisProps {
+  selectedSymbol?: string;
+  selectedTimeframe?: string;
+}
+
+export const CryptoAnalysisComponent = ({ selectedSymbol = 'ARBUSDT', selectedTimeframe = '15m' }: CryptoAnalysisProps) => {
   const [priceData, setPriceData] = useState<CryptoPriceData[]>([]);
   const [currentStats, setCurrentStats] = useState<any>(null);
   const [analysis, setAnalysis] = useState<any>(null);
@@ -20,21 +25,23 @@ export const CryptoAnalysisComponent = () => {
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const symbol = 'ARBUSDT';
-
   useEffect(() => {
     const initializeData = async () => {
       try {
         setIsLoading(true);
-        console.log('Fetching initial data for', symbol);
+        console.log('Fetching initial data for', selectedSymbol);
         
-        // Fetch historical data
-        const historicalData = await fetchBinanceKlines(symbol, '1h', 100);
-        console.log('Historical data loaded:', historicalData.length, 'candles');
+        // Fetch historical data with selected timeframe
+        const intervalMap = {
+          '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+          '1h': '1h', '4h': '4h', '1d': '1d'
+        };
+        const historicalData = await fetchBinanceKlines(selectedSymbol, intervalMap[selectedTimeframe] || '1h', 100);
+        console.log(`Historical data loaded for ${selectedSymbol} (${selectedTimeframe}):`, historicalData.length, 'candles');
         setPriceData(historicalData);
         
         // Fetch current stats
-        const stats = await fetch24hrStats(symbol);
+        const stats = await fetch24hrStats(selectedSymbol);
         console.log('24hr stats loaded:', stats);
         setCurrentStats(stats);
         setLivePrice(stats.price);
@@ -56,7 +63,7 @@ export const CryptoAnalysisComponent = () => {
     initializeData();
 
     // Setup WebSocket for live updates
-    const wsClient = createBinanceWebSocketClient(symbol, '1m', (newData) => {
+    const wsClient = createBinanceWebSocketClient(selectedSymbol, '1m', (newData) => {
       console.log('Live price update:', newData.close);
       setPriceData(prev => [...prev.slice(-99), newData]);
       setLivePrice(newData.close);
@@ -68,7 +75,7 @@ export const CryptoAnalysisComponent = () => {
     return () => {
       wsClient.disconnect();
     };
-  }, []);
+  }, [selectedSymbol, selectedTimeframe]);
 
   // Re-analyze when price data updates
   useEffect(() => {
@@ -236,7 +243,7 @@ export const CryptoAnalysisComponent = () => {
       <Card className="bg-slate-800/50 border-slate-700">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg text-white">ARB/USDT Live Analysis</CardTitle>
+            <CardTitle className="text-lg text-white">{selectedSymbol} Live Analysis ({selectedTimeframe})</CardTitle>
             <Badge variant="outline" className="text-xs">
               Cập nhật: {lastUpdate.toLocaleTimeString()}
             </Badge>

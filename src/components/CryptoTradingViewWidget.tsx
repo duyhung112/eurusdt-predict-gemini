@@ -69,7 +69,7 @@ export const CryptoTradingViewWidget = ({
   }, [symbol, interval]);
 
   return (
-    <div className="tradingview-widget-container h-[700px] xl:h-[800px]" ref={container}>
+    <div className="tradingview-widget-container h-[900px] xl:h-[1000px]" ref={container}>
       <div className="tradingview-widget-container__widget"></div>
     </div>
   );

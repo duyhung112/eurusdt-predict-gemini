@@ -10,7 +10,12 @@ import { Crown, RefreshCw, TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
 import { toast } from "sonner";
 import { generateMasterAnalysis, MasterAnalysis } from "@/utils/masterAnalysis";
 
-export const MasterAnalysisComponent = () => {
+interface MasterAnalysisProps {
+  selectedSymbol?: string;
+  selectedTimeframe?: string;
+}
+
+export const MasterAnalysisComponent = ({ selectedSymbol = 'ARBUSDT', selectedTimeframe = '15m' }: MasterAnalysisProps) => {
   const [analysis, setAnalysis] = useState<MasterAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
@@ -31,9 +36,9 @@ export const MasterAnalysisComponent = () => {
     setIsLoading(true);
     try {
       localStorage.setItem('gemini_api_key', geminiApiKey);
-      console.log('Starting master analysis with real Binance data...');
+      console.log(`Starting master analysis with real Binance data for ${selectedSymbol} (${selectedTimeframe})...`);
       
-      const result = await generateMasterAnalysis(geminiApiKey);
+      const result = await generateMasterAnalysis(geminiApiKey, selectedSymbol, selectedTimeframe);
       setAnalysis(result);
       
       if (result.masterConfidence > 0) {
@@ -91,7 +96,7 @@ export const MasterAnalysisComponent = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Crown className="h-5 w-5 text-yellow-400" />
-            <h3 className="text-lg font-semibold text-white">Master AI Analysis</h3>
+            <h3 className="text-lg font-semibold text-white">Master {selectedSymbol} ({selectedTimeframe})</h3>
           </div>
           <Button
             variant="outline"

@@ -158,23 +158,38 @@ const Index = () => {
               </TabsList>
               
               <TabsContent value="crypto" className="mt-4">
-                <CryptoAnalysisComponent />
+                <CryptoAnalysisComponent 
+                  selectedSymbol={selectedSymbol}
+                  selectedTimeframe={selectedTimeframe}
+                />
               </TabsContent>
               
               <TabsContent value="master" className="mt-4">
-                <MasterAnalysisComponent />
+                <MasterAnalysisComponent 
+                  selectedSymbol={selectedSymbol}
+                  selectedTimeframe={selectedTimeframe}
+                />
               </TabsContent>
               
               <TabsContent value="comprehensive" className="mt-4">
-                <ComprehensiveAnalysisComponent />
+                <ComprehensiveAnalysisComponent 
+                  selectedSymbol={selectedSymbol}
+                  selectedTimeframe={selectedTimeframe}
+                />
               </TabsContent>
               
               <TabsContent value="analysis" className="mt-4">
-                <AIAnalysis />
+                <AIAnalysis 
+                  selectedSymbol={selectedSymbol}
+                  selectedTimeframe={selectedTimeframe}
+                />
               </TabsContent>
               
               <TabsContent value="predictions" className="mt-4">
-                <AIPredictions />
+                <AIPredictions 
+                  selectedSymbol={selectedSymbol}
+                  selectedTimeframe={selectedTimeframe}
+                />
               </TabsContent>
             </Tabs>
           </div>
