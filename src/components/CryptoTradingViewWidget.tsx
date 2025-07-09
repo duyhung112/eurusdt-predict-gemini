@@ -25,7 +25,7 @@ export const CryptoTradingViewWidget = ({
     script.async = true;
     script.innerHTML = `
       {
-        "autosize": true,
+        "autosize": false,
         "symbol": "${symbol}",
         "interval": "${interval}",
         "timezone": "Etc/UTC",
